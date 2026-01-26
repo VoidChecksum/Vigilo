@@ -1,0 +1,15 @@
+# Generated reports (project-specific, not plugin)
+.vigilo/
+.decepticon/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Local settings (if using plugin settings pattern)
+.vigilo/*.local.md

@@ -1,0 +1,39 @@
+{
+  "name": "vigilo",
+  "version": "0.0.7",
+  "description": "AI-powered smart contract security audit. Full LSP support for Solidity and Rust, analysis support for Cairo and Move.",
+  "author": {
+    "name": "PurpleCHOIms",
+    "email": "catower917@gmail.com"
+  },
+  "repository": "https://github.com/PurpleAILAB/Vigilo",
+  "homepage": "https://github.com/PurpleAILAB/Vigilo",
+  "license": "BSL-1.1",
+  "keywords": [
+    "security",
+    "audit",
+    "smart-contract",
+    "solidity",
+    "web3",
+    "blockchain",
+    "defi",
+    "security-tool",
+    "claude-plugin"
+  ],
+  "lspServers": {
+    "solidity": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/solidity-lsp.js"],
+      "extensionToLanguage": {
+        ".sol": "solidity"
+      }
+    },
+    "rust": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/rust-lsp.js"],
+      "extensionToLanguage": {
+        ".rs": "rust"
+      }
+    }
+  }
+}

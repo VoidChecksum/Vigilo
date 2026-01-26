@@ -1,0 +1,16 @@
+{
+  "solidity": {
+    "command": "node",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/solidity-lsp.js"],
+    "extensionToLanguage": {
+      ".sol": "solidity"
+    }
+  },
+  "rust": {
+    "command": "node",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/rust-lsp.js"],
+    "extensionToLanguage": {
+      ".rs": "rust"
+    }
+  }
+}

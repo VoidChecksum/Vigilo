@@ -1,0 +1,69 @@
+{
+  "name": "vigilo",
+  "version": "0.4.0",
+  "description": "Vigilo - Web3 Smart Contract Security Auditing Orchestrator for OpenCode",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist",
+    "skills",
+    "agents",
+    "commands"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs && tsc --emitDeclarationOnly",
+    "dev": "npm run build -- --watch",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "web3",
+    "smart-contract",
+    "security",
+    "audit",
+    "solidity",
+    "vyper",
+    "cairo",
+    "foundry",
+    "hardhat"
+  ],
+  "author": "catower",
+  "license": "MIT",
+  "dependencies": {
+    "@ast-grep/cli": "^0.40.0",
+    "@ast-grep/napi": "^0.40.0",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "adm-zip": "^0.5.16",
+    "js-yaml": "^4.1.0",
+    "jsonc-parser": "^3.3.1",
+    "picomatch": "^4.0.2",
+    "zod": "^3.24.4"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^1.1.19",
+    "@opencode-ai/sdk": "^1.1.19"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.1.19",
+    "@opencode-ai/sdk": "^1.1.19",
+    "@types/adm-zip": "^0.5.7",
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.0.10",
+    "@types/picomatch": "^3.0.2",
+    "esbuild": "^0.24.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,149 @@
+import type { AgentConfig } from "@opencode-ai/sdk"
+import type {
+  BuiltinAuditorName,
+  AuditorOverrides,
+  AuditorPromptMetadata,
+  AvailableAuditor,
+  AvailableSkill,
+} from "./types"
+import { createVigiloAgent, VIGILO_METADATA } from "./vigilo"
+import {
+  AUDITOR_FACTORIES,
+  AUDITOR_METADATA,
+} from "./auditors"
+import {
+  resolveModelWithFallback,
+  AUDITOR_MODEL_REQUIREMENTS,
+  fetchAvailableModels,
+} from "../shared"
+
+function mergeAgentConfig(
+  base: AgentConfig,
+  override: Partial<AgentConfig> & { prompt_append?: string }
+): AgentConfig {
+  const { prompt_append, ...rest } = override
+  const merged = { ...base, ...rest }
+
+  if (prompt_append && merged.prompt) {
+    merged.prompt = merged.prompt + "\n" + prompt_append
+  }
+
+  return merged
+}
+
+export interface CreateBuiltinAgentsOptions {
+  disabledAgents?: string[]
+  agentOverrides?: AuditorOverrides
+  systemDefaultModel?: string
+  client?: unknown
+}
+
+export async function createBuiltinAgents(
+  options: CreateBuiltinAgentsOptions = {}
+): Promise<Record<string, AgentConfig>> {
+  const {
+    disabledAgents = [],
+    agentOverrides = {},
+    systemDefaultModel = "anthropic/claude-sonnet-4-5",
+    client,
+  } = options
+
+  const availableModels = client ? await fetchAvailableModels(client) : new Set<string>()
+
+  const result: Record<string, AgentConfig> = {}
+  const availableAuditors: AvailableAuditor[] = []
+  const availableSkills: AvailableSkill[] = []
+
+  const disabledSet = new Set(disabledAgents.map(d => d.toLowerCase()))
+
+  for (const [name, factory] of Object.entries(AUDITOR_FACTORIES)) {
+    if (disabledSet.has(name.toLowerCase())) continue
+
+    const override = agentOverrides[name as BuiltinAuditorName]
+    if (override?.disable) continue
+
+    const requirement = AUDITOR_MODEL_REQUIREMENTS[name]
+    const { model } = resolveModelWithFallback({
+      userModel: override?.model,
+      fallbackChain: requirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
+
+    let config = factory(model)
+
+    if (override) {
+      config = mergeAgentConfig(config, override)
+    }
+
+    result[name] = config
+
+    const metadata = AUDITOR_METADATA[name as keyof typeof AUDITOR_METADATA]
+    availableAuditors.push({
+      name,
+      description: config.description ?? `${name} security auditor`,
+      metadata,
+    })
+  }
+
+  if (!disabledSet.has("vigilo")) {
+    const vigiloOverride = agentOverrides["vigilo"]
+    const vigiloRequirement = AUDITOR_MODEL_REQUIREMENTS["vigilo"]
+    const { model: vigiloModel } = resolveModelWithFallback({
+      userModel: vigiloOverride?.model,
+      fallbackChain: vigiloRequirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
+
+    let vigiloConfig = createVigiloAgent(vigiloModel, availableAuditors, availableSkills)
+
+    if (vigiloOverride) {
+      vigiloConfig = mergeAgentConfig(vigiloConfig, vigiloOverride)
+    }
+
+    result["vigilo"] = vigiloConfig
+  }
+
+  return result
+}
+
+export function getAuditorConfig(
+  auditors: Record<string, AgentConfig>,
+  name: string
+): AgentConfig | undefined {
+  const lowercaseName = name.toLowerCase()
+  for (const [key, config] of Object.entries(auditors)) {
+    if (key.toLowerCase() === lowercaseName) {
+      return config
+    }
+  }
+  return undefined
+}
+
+export function listAvailableAgents(agents: Record<string, AgentConfig>): string[] {
+  return Object.keys(agents)
+}
+
+export const createBuiltinAuditors = createBuiltinAgents
+export const listAvailableAuditors = listAvailableAgents
+
+export const PROTOCOL_AUDITOR_MAPPING: Record<string, string[]> = {
+  amm: ["flashloan-auditor", "oracle-auditor", "reentrancy-auditor"],
+  dex: ["flashloan-auditor", "oracle-auditor", "reentrancy-auditor"],
+  lending: ["oracle-auditor", "logic-auditor", "flashloan-auditor"],
+  vault: ["logic-auditor", "reentrancy-auditor", "defi-auditor"],
+  erc4626: ["logic-auditor", "reentrancy-auditor", "defi-auditor"],
+  governance: ["flashloan-auditor", "access-control-auditor", "logic-auditor"],
+  bridge: ["cross-chain-auditor", "access-control-auditor", "reentrancy-auditor"],
+  staking: ["logic-auditor", "reentrancy-auditor", "defi-auditor"],
+  token: ["access-control-auditor", "logic-auditor", "reentrancy-auditor"],
+  default: ["reentrancy-auditor", "access-control-auditor", "logic-auditor"],
+}
+
+export function getAuditorsForProtocol(protocolType: string): string[] {
+  const normalized = protocolType.toLowerCase().trim()
+  return PROTOCOL_AUDITOR_MAPPING[normalized] ?? PROTOCOL_AUDITOR_MAPPING.default
+}
+
+export { VIGILO_METADATA }
