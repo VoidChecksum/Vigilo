@@ -7,9 +7,15 @@
     "type": "git",
     "url": "https://github.com/PurpleAILAB/Vigilo"
   },
-  "os": ["win32"],
-  "cpu": ["x64"],
-  "files": ["bin"],
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin"
+  ],
   "bin": {
     "vigilo": "./bin/vigilo.exe"
   }
