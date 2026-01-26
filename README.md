@@ -1,21 +1,29 @@
 <p align="center">
-  <img src="shared/assets/logo.png" alt="Vigilo" width="200">
+  <img src="assets/logo.png" alt="Vigilo" height="128">
 </p>
 
-# Vigilo
+<h1 align="center">Vigilo</h1>
 
-**Web3 Smart Contract Security Auditing Agent**
+<p align="center">
+  <strong>Web3 Smart Contract Security Auditing Agent</strong>
+</p>
 
-From Latin "to watch, guard" - Vigilo watches over your smart contracts to find vulnerabilities before attackers do.
+<p align="center">
+  From Latin "to watch, guard" - Vigilo watches over your smart contracts to find vulnerabilities before attackers do.
+</p>
+
+---
 
 ## Platforms
 
 Vigilo is available for multiple AI coding assistants:
 
-| Platform | Package | Status |
-|----------|---------|--------|
-| [Claude Code](https://claude.ai/code) | [`packages/claude`](./packages/claude) | Stable |
-| [OpenCode](https://github.com/sst/opencode) | [`packages/opencode`](./packages/opencode) | Stable |
+| Platform | Package | Status | Recommended |
+|----------|---------|--------|-------------|
+| [OpenCode](https://github.com/sst/opencode) | [`packages/opencode`](./packages/opencode) | Stable | ⭐ **Recommended** |
+| [Claude Code](https://claude.ai/code) | [`packages/claude`](./packages/claude) | Stable | |
+
+> **Why OpenCode?** OpenCode provides more flexibility with model selection, better plugin extensibility, and cost-effective auditing with configurable model tiers per auditor.
 
 ## Features
 
