@@ -1,0 +1,16 @@
+{
+  "name": "vigilo-windows-x64",
+  "version": "1.0.0",
+  "description": "Platform-specific binary for vigilo (windows-x64)",
+  "license": "BSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PurpleAILAB/Vigilo"
+  },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "files": ["bin"],
+  "bin": {
+    "vigilo": "./bin/vigilo.exe"
+  }
+}

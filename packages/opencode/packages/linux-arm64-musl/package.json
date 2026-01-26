@@ -1,0 +1,16 @@
+{
+  "name": "vigilo-linux-arm64-musl",
+  "version": "1.0.0",
+  "description": "Platform-specific binary for vigilo (linux-arm64-musl)",
+  "license": "BSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PurpleAILAB/Vigilo"
+  },
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "files": ["bin"],
+  "bin": {
+    "vigilo": "./bin/vigilo"
+  }
+}

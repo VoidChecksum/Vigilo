@@ -1,6 +1,6 @@
 {
   "name": "vigilo",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "Vigilo - Web3 Smart Contract Security Auditing Orchestrator for OpenCode",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -77,5 +77,22 @@
     "esbuild": "^0.24.2",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.3"
-  }
+  },
+  "optionalDependencies": {
+    "vigilo-darwin-arm64": "1.0.0",
+    "vigilo-darwin-x64": "1.0.0",
+    "vigilo-linux-arm64": "1.0.0",
+    "vigilo-linux-arm64-musl": "1.0.0",
+    "vigilo-linux-x64": "1.0.0",
+    "vigilo-linux-x64-musl": "1.0.0",
+    "vigilo-windows-x64": "1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PurpleAILAB/Vigilo"
+  },
+  "bugs": {
+    "url": "https://github.com/PurpleAILAB/Vigilo/issues"
+  },
+  "homepage": "https://github.com/PurpleAILAB/Vigilo#readme"
 }
