@@ -14,6 +14,7 @@
 
 <div align="center">
 
+[![npm version](https://img.shields.io/npm/v/vigilo?color=cb3837&labelColor=black&logo=npm&style=flat-square)](https://www.npmjs.com/package/vigilo)
 [![GitHub Release](https://img.shields.io/github/v/release/PurpleAILAB/Vigilo?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/PurpleAILAB/Vigilo?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/PurpleAILAB/Vigilo?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/issues)
@@ -31,22 +32,36 @@ Vigilo is an AI-powered smart contract security auditor that runs inside [OpenCo
 
 ## Installation
 
-Vigilo supports both **OpenCode** and **Claude Code**. We recommend OpenCode for better flexibility and cost control.
+### Quick Install (Recommended)
 
-### OpenCode (Recommended)
+```bash
+bunx vigilo install
+```
 
-Copy and paste this prompt to your LLM agent:
+That's it! The CLI will guide you through the setup interactively.
+
+### Alternative: Non-Interactive Install
+
+```bash
+bunx vigilo install --no-tui --foundry=yes --model=sonnet
+```
+
+### For LLM Agents
+
+Paste this into your LLM agent session:
 
 ```
 Install and configure vigilo by following the instructions here:
 https://raw.githubusercontent.com/PurpleAILAB/Vigilo/main/packages/opencode/docs/installation.md
 ```
 
-See the full [Installation Guide](./packages/opencode/docs/installation.md).
-
 ### Claude Code
 
 See [Claude Plugin README](./packages/claude/README.md).
+
+---
+
+See the full [Installation Guide](./packages/opencode/docs/installation.md) for more options.
 
 ---
 
