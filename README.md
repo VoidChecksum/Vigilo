@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Vigilo" width="400">
+  <img src="assets/logo.png" alt="Vigilo">
 </p>
 
 <h1 align="center">Vigilo</h1>
