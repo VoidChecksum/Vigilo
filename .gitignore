@@ -31,3 +31,6 @@ coverage/
 
 # Vigilo generated (in target projects)
 .vigilo/
+
+# Reference repositories
+reference/

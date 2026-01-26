@@ -1,12 +1,6 @@
-import * as esbuild from "esbuild"
+#!/usr/bin/env bun
+import { $ } from "bun"
 
-await esbuild.build({
-  entryPoints: ["src/index.ts"],
-  outdir: "dist",
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "esnext",
-  external: ["@opencode-ai/plugin", "@opencode-ai/sdk", "@ast-grep/napi", "bun", "jsonc-parser"],
-  sourcemap: true,
-})
+await $`bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi`
+await $`tsc --emitDeclarationOnly`
+await $`bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi`

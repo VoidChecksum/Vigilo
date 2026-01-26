@@ -1,0 +1,96 @@
+#!/usr/bin/env bun
+import { $ } from "bun"
+import { existsSync, mkdirSync } from "node:fs"
+import { join } from "node:path"
+
+interface PlatformTarget {
+  dir: string
+  target: string
+  binary: string
+  description: string
+}
+
+const PLATFORMS: PlatformTarget[] = [
+  { dir: "darwin-arm64", target: "bun-darwin-arm64", binary: "vigilo", description: "macOS ARM64" },
+  { dir: "darwin-x64", target: "bun-darwin-x64", binary: "vigilo", description: "macOS x64" },
+  { dir: "linux-x64", target: "bun-linux-x64", binary: "vigilo", description: "Linux x64 (glibc)" },
+  { dir: "linux-arm64", target: "bun-linux-arm64", binary: "vigilo", description: "Linux ARM64 (glibc)" },
+  { dir: "linux-x64-musl", target: "bun-linux-x64-musl", binary: "vigilo", description: "Linux x64 (musl)" },
+  { dir: "linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "vigilo", description: "Linux ARM64 (musl)" },
+  { dir: "windows-x64", target: "bun-windows-x64", binary: "vigilo.exe", description: "Windows x64" },
+]
+
+const ENTRY_POINT = "src/cli/index.ts"
+
+async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
+  const packageDir = join("packages", platform.dir)
+  const binDir = join(packageDir, "bin")
+  const outfile = join(binDir, platform.binary)
+
+  if (!existsSync(binDir)) {
+    mkdirSync(binDir, { recursive: true })
+  }
+
+  console.log(`\n📦 Building ${platform.description}...`)
+  console.log(`   Target: ${platform.target}`)
+  console.log(`   Output: ${outfile}`)
+
+  try {
+    await $`bun build --compile --minify --sourcemap --bytecode --target=${platform.target} ${ENTRY_POINT} --outfile=${outfile}`
+
+    if (!existsSync(outfile)) {
+      console.error(`   ❌ Binary not found after build: ${outfile}`)
+      return false
+    }
+
+    console.log(`   ✓ Binary created successfully`)
+    return true
+  } catch (error) {
+    console.error(`   ❌ Build failed: ${error}`)
+    return false
+  }
+}
+
+async function main() {
+  console.log("🔨 Building vigilo platform binaries")
+  console.log(`   Entry point: ${ENTRY_POINT}`)
+  console.log(`   Platforms: ${PLATFORMS.length}`)
+
+  if (!existsSync(ENTRY_POINT)) {
+    console.error(`\n❌ Entry point not found: ${ENTRY_POINT}`)
+    process.exit(1)
+  }
+
+  const results: { platform: string; success: boolean }[] = []
+
+  for (const platform of PLATFORMS) {
+    const success = await buildPlatform(platform)
+    results.push({ platform: platform.description, success })
+  }
+
+  console.log("\n" + "=".repeat(50))
+  console.log("Build Summary:")
+  console.log("=".repeat(50))
+
+  const succeeded = results.filter(r => r.success).length
+  const failed = results.filter(r => !r.success).length
+
+  for (const result of results) {
+    const icon = result.success ? "✓" : "✗"
+    console.log(`  ${icon} ${result.platform}`)
+  }
+
+  console.log("=".repeat(50))
+  console.log(`Total: ${succeeded} succeeded, ${failed} failed`)
+
+  if (failed > 0) {
+    process.exit(1)
+  }
+
+  console.log("\n✅ All platform binaries built successfully!\n")
+}
+
+main().catch((error) => {
+  console.error("Fatal error:", error)
+  process.exit(1)
+})

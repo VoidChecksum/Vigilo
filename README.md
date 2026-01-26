@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Vigilo">
+  <img src="assets/logo.png" alt="Vigilo" width="400">
 </p>
 
 <h1 align="center">Vigilo</h1>
@@ -9,85 +9,75 @@
 </p>
 
 <p align="center">
-  From Latin "to watch, guard" - Vigilo watches over your smart contracts to find vulnerabilities before attackers do.
+  From Latin "to watch, guard" — Vigilo watches over your smart contracts to find vulnerabilities before attackers do.
 </p>
+
+<div align="center">
+
+[![GitHub Release](https://img.shields.io/github/v/release/PurpleAILAB/Vigilo?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/PurpleAILAB/Vigilo?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/PurpleAILAB/Vigilo?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/issues)
+[![License](https://img.shields.io/badge/license-BSL--1.1-white?labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/blob/main/LICENSE)
+
+</div>
 
 ---
 
-## Platforms
+## What is Vigilo?
 
-Vigilo is available for multiple AI coding assistants:
+Vigilo is an AI-powered smart contract security auditor that runs inside [OpenCode](https://github.com/anomalyco/opencode). It spawns specialized auditors in parallel to find vulnerabilities and generate validated PoCs.
 
-| Platform | Package | Status | Recommended |
-|----------|---------|--------|-------------|
-| [OpenCode](https://github.com/sst/opencode) | [`packages/opencode`](./packages/opencode) | Stable | ⭐ **Recommended** |
-| [Claude Code](https://claude.ai/code) | [`packages/claude`](./packages/claude) | Stable | |
+---
 
-> **Why OpenCode?** OpenCode provides more flexibility with model selection, better plugin extensibility, and cost-effective auditing with configurable model tiers per auditor.
+## Installation
 
-## Features
+Vigilo supports both **OpenCode** and **Claude Code**. We recommend OpenCode for better flexibility and cost control.
 
-- **Automated Audit Workflow**: Scope resolution → Recon → Deep Analysis → PoC → Report
-- **Specialized Auditors**: Protocol-specific vulnerability detection (reentrancy, oracle, access-control, etc.)
-- **Multi-Language Support**: Solidity, Vyper, Cairo, Rust
-- **LSP Integration**: Language server support for smart contract languages
-- **Foundry Integration**: Built-in tools for forge build/test/coverage
-- **Parallel Analysis**: Spawn multiple auditors for comprehensive coverage
-- **PoC Validation**: Generate and validate Foundry tests
+### OpenCode (Recommended)
 
-## Quick Start
+Copy and paste this prompt to your LLM agent:
+
+```
+Install and configure vigilo by following the instructions here:
+https://raw.githubusercontent.com/PurpleAILAB/Vigilo/main/packages/opencode/docs/installation.md
+```
+
+See the full [Installation Guide](./packages/opencode/docs/installation.md).
 
 ### Claude Code
 
-```bash
-# Register marketplace
-/plugin marketplace add PurpleAILAB/Vigilo
+See [Claude Plugin README](./packages/claude/README.md).
 
-# Install
-/plugin install vigilo
-```
+---
 
-### OpenCode
+## Features
 
-```bash
-# Clone repository
-git clone https://github.com/PurpleAILAB/vigilo.git
-cd vigilo/packages/opencode
+- **Automated Audit Workflow**: Scope → Recon → Deep Analysis → PoC → Report
+- **Specialized Auditors**: Reentrancy, Oracle, Access Control, Flashloan, Logic, DeFi, Token, Cross-Chain
+- **Multi-Language Support**: Solidity, Vyper, Cairo, Rust
+- **Foundry Integration**: `forge build`, `forge test`, `forge coverage`
+- **LSP Integration**: Goto-definition, references, diagnostics
+- **Parallel Analysis**: Multiple auditors running concurrently
+- **PoC Validation**: Auto-generate and validate Foundry tests
 
-# Install and build
-npm install
-npm run build
-
-# Add to ~/.config/opencode/opencode.json
-{
-  "plugin": ["file:///path/to/vigilo/packages/opencode/dist/index.js"]
-}
-```
+---
 
 ## Usage
 
 ```bash
-# Run full security audit
+cd my-solidity-project
+opencode
+
+# Start audit
 /audit
 
-# Generate PoC from attack scenario
+# Generate PoC
 /poc .vigilo/findings/high/H-01-reentrancy.md
 ```
 
-## Audit Workflow
+---
 
-```
-Phase 0        Phase 1           Phase 2          Phase 3    Phase 4
-(scope)        (recon)           (audit)          (PoC)      (report)
-   │              │                  │               │           │
-   ▼              ▼                  ▼               ▼           ▼
- scope.txt ─→ code-analyzer ──┐
-              docs-analyzer ──┼─→ recon/*.md ─→ auditors ─→ findings/ ─→ PoC ─→ report
-                              │                (parallel)
-                              └─ protocol type detected
-```
-
-## Directory Structure (Generated)
+## Directory Structure
 
 ```
 .vigilo/
@@ -99,19 +89,50 @@ Phase 0        Phase 1           Phase 2          Phase 3    Phase 4
 └── reports/         # Final reports
 ```
 
-## Documentation
+---
 
-- [Installation Guide](./docs/installation.md)
-- [Usage Guide](./docs/usage.md)
-- [Claude Plugin](./packages/claude/README.md)
-- [OpenCode Plugin](./packages/opencode/README.md)
+## Platforms
+
+| Platform | Package | Status |
+|----------|---------|--------|
+| [OpenCode](https://github.com/anomalyco/opencode) | [`packages/opencode`](./packages/opencode) | ⭐ **Recommended** |
+| [Claude Code](https://claude.ai/code) | [`packages/claude`](./packages/claude) | Stable |
+
+> **Why OpenCode?** More flexibility with model selection, better plugin extensibility, and cost-effective auditing with configurable models per auditor.
+
+---
+
+## Troubleshooting
+
+```bash
+bunx vigilo doctor
+bunx vigilo doctor --verbose
+```
+
+| Issue | Solution |
+|-------|----------|
+| OpenCode not found | Install from https://opencode.ai/docs |
+| Foundry not found | `curl -L https://foundry.paradigm.xyz \| bash && foundryup` |
+| Vigilo not registered | Run `bunx vigilo install` again |
+
+---
 
 ## License
 
-This project is licensed under the [Business Source License 1.1](LICENSE).
+[Business Source License 1.1](LICENSE)
 
-- **Non-production use**: Free (personal, educational, research, non-commercial security auditing)
+- **Non-production use**: Free
 - **Production use**: Requires commercial license
 - **Change Date**: 2029-01-21 (converts to Apache-2.0)
 
 Commercial licensing: catower917@gmail.com
+
+---
+
+<div align="center">
+
+**Ready to hunt bugs? 🔍**
+
+[Get Started](./packages/opencode/docs/installation.md) · [Report Bug](https://github.com/PurpleAILAB/Vigilo/issues) · [Request Feature](https://github.com/PurpleAILAB/Vigilo/issues)
+
+</div>

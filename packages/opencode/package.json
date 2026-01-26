@@ -5,11 +5,16 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "bin": {
+    "vigilo": "./bin/vigilo.js"
+  },
   "files": [
     "dist",
+    "bin",
     "skills",
     "agents",
-    "commands"
+    "commands",
+    "postinstall.mjs"
   ],
   "exports": {
     ".": {
@@ -18,12 +23,15 @@
     }
   },
   "scripts": {
-    "build": "node build.mjs && tsc --emitDeclarationOnly",
-    "dev": "npm run build -- --watch",
+    "build": "bun run build.mjs",
+    "build:all": "bun run build && bun run build:binaries",
+    "build:binaries": "bun run script/build-binaries.ts",
+    "dev": "bun run build --watch",
     "clean": "rimraf dist",
-    "prepublishOnly": "npm run clean && npm run build",
+    "prepublishOnly": "bun run clean && bun run build",
+    "postinstall": "node postinstall.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "bun test"
   },
   "keywords": [
     "opencode",
@@ -43,10 +51,14 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
+    "@clack/prompts": "^0.11.0",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "adm-zip": "^0.5.16",
+    "commander": "^14.0.2",
+    "detect-libc": "^2.0.0",
     "js-yaml": "^4.1.0",
     "jsonc-parser": "^3.3.1",
+    "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "zod": "^3.24.4"
   },
