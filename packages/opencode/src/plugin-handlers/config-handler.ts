@@ -92,7 +92,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     })
 
     log("Agents loaded", {
-      model: config.model,
+      systemDefaultModel: config.model,
       agents: listAvailableAgents(builtinAgents),
     })
 

@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import type { InstallArgs, InstallConfig, BooleanArg, AuditModel, DetectedConfig } from "./types"
+import type { InstallArgs, InstallConfig, ClaudeSubscription, BooleanArg, DetectedConfig } from "./types"
 import {
   addPluginToOpenCodeConfig,
   writeVigiloConfig,
@@ -24,15 +24,28 @@ const SYMBOLS = {
   star: color.yellow("*"),
 }
 
-const MODEL_OPTIONS = {
-  sonnet: "anthropic/claude-sonnet-4-5",
-  opus: "anthropic/claude-opus-4-5",
-} as const
+function formatProvider(name: string, enabled: boolean, detail?: string): string {
+  const status = enabled ? SYMBOLS.check : color.dim("○")
+  const label = enabled ? color.white(name) : color.dim(name)
+  const suffix = detail ? color.dim(` (${detail})`) : ""
+  return `  ${status} ${label}${suffix}`
+}
 
 function formatConfigSummary(config: InstallConfig): string {
   const lines: string[] = []
 
   lines.push(color.bold(color.white("Configuration Summary")))
+  lines.push("")
+
+  const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
+  lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
+  lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.2 for deep analysis"))
+  lines.push(formatProvider("Gemini", config.hasGemini))
+  lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
+  lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
+
+  lines.push("")
+  lines.push(color.dim("─".repeat(40)))
   lines.push("")
 
   const foundryStatus = config.hasFoundry ? SYMBOLS.check : color.dim("○")
@@ -43,8 +56,10 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.dim("─".repeat(40)))
   lines.push("")
 
-  lines.push(color.bold(color.white("Audit Model")))
-  lines.push(`  ${SYMBOLS.info} ${color.cyan(config.auditModel)}`)
+  lines.push(color.bold(color.white("Model Assignment")))
+  lines.push("")
+  lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen`)
 
   return lines.join("\n")
 }
@@ -102,37 +117,149 @@ function printBox(content: string, title?: string): void {
 function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string[] } {
   const errors: string[] = []
 
+  if (args.claude === undefined) {
+    errors.push("--claude is required (values: no, yes, max20)")
+  } else if (!["no", "yes", "max20"].includes(args.claude)) {
+    errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
+  }
+
+  if (args.gemini === undefined) {
+    errors.push("--gemini is required (values: no, yes)")
+  } else if (!["no", "yes"].includes(args.gemini)) {
+    errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
+  }
+
+  if (args.copilot === undefined) {
+    errors.push("--copilot is required (values: no, yes)")
+  } else if (!["no", "yes"].includes(args.copilot)) {
+    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
+  }
+
   if (args.foundry === undefined) {
     errors.push("--foundry is required (values: no, yes)")
   } else if (!["no", "yes"].includes(args.foundry)) {
     errors.push(`Invalid --foundry value: ${args.foundry} (expected: no, yes)`)
   }
 
-  if (args.model !== undefined && !["sonnet", "opus"].includes(args.model)) {
-    errors.push(`Invalid --model value: ${args.model} (expected: sonnet, opus)`)
+  if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
+    errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
+  }
+
+  if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
+    errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
   }
 
   return { valid: errors.length === 0, errors }
 }
 
 function argsToConfig(args: InstallArgs): InstallConfig {
-  const modelKey = args.model ?? "sonnet"
   return {
+    hasClaude: args.claude !== "no",
+    isMax20: args.claude === "max20",
+    hasOpenAI: args.openai === "yes",
+    hasGemini: args.gemini === "yes",
+    hasCopilot: args.copilot === "yes",
+    hasOpencodeZen: args.opencodeZen === "yes",
     hasFoundry: args.foundry === "yes",
-    auditModel: MODEL_OPTIONS[modelKey],
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { foundry: BooleanArg; model: AuditModel } {
-  const modelKey = detected.auditModel.includes("opus") ? "opus" : "sonnet"
+function detectedToInitialValues(detected: DetectedConfig): {
+  claude: ClaudeSubscription
+  openai: BooleanArg
+  gemini: BooleanArg
+  copilot: BooleanArg
+  opencodeZen: BooleanArg
+  foundry: BooleanArg
+} {
+  let claude: ClaudeSubscription = "no"
+  if (detected.hasClaude) {
+    claude = detected.isMax20 ? "max20" : "yes"
+  }
+
   return {
+    claude,
+    openai: detected.hasOpenAI ? "yes" : "no",
+    gemini: detected.hasGemini ? "yes" : "no",
+    copilot: detected.hasCopilot ? "yes" : "no",
+    opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     foundry: detected.hasFoundry ? "yes" : "no",
-    model: modelKey as AuditModel,
   }
 }
 
 async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | null> {
   const initial = detectedToInitialValues(detected)
+
+  const claude = await p.select({
+    message: "Do you have a Claude Pro/Max subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Will use opencode/big-pickle as fallback" },
+      { value: "yes" as const, label: "Yes (standard)", hint: "Claude Opus 4.5 for main auditor" },
+      { value: "max20" as const, label: "Yes (max20 mode)", hint: "Full power with Claude Opus 4.5 max" },
+    ],
+    initialValue: initial.claude,
+  })
+
+  if (p.isCancel(claude)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const openai = await p.select({
+    message: "Do you have an OpenAI/ChatGPT Plus subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Auditors will use fallback models" },
+      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for deep analysis" },
+    ],
+    initialValue: initial.openai,
+  })
+
+  if (p.isCancel(openai)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const gemini = await p.select({
+    message: "Will you integrate Google Gemini?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Auditors will use fallback" },
+      { value: "yes" as const, label: "Yes", hint: "Gemini 3 Pro/Flash for auditing" },
+    ],
+    initialValue: initial.gemini,
+  })
+
+  if (p.isCancel(gemini)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const copilot = await p.select({
+    message: "Do you have a GitHub Copilot subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Only native providers will be used" },
+      { value: "yes" as const, label: "Yes", hint: "Fallback option when native providers unavailable" },
+    ],
+    initialValue: initial.copilot,
+  })
+
+  if (p.isCancel(copilot)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const opencodeZen = await p.select({
+    message: "Do you have access to OpenCode Zen (opencode/ models)?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+      { value: "yes" as const, label: "Yes", hint: "opencode/claude-opus-4-5, opencode/gpt-5.2, etc." },
+    ],
+    initialValue: initial.opencodeZen,
+  })
+
+  if (p.isCancel(opencodeZen)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
 
   const foundryInstalled = await isFoundryInstalled()
   const foundryVersion = foundryInstalled ? await getFoundryVersion() : null
@@ -158,23 +285,14 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     foundry = foundryAnswer
   }
 
-  const model = await p.select({
-    message: "Select default audit model:",
-    options: [
-      { value: "sonnet" as const, label: "Claude Sonnet 4.5", hint: "Recommended - cost-effective" },
-      { value: "opus" as const, label: "Claude Opus 4.5", hint: "Deep analysis - more expensive" },
-    ],
-    initialValue: initial.model,
-  })
-
-  if (p.isCancel(model)) {
-    p.cancel("Installation cancelled.")
-    return null
-  }
-
   return {
+    hasClaude: claude !== "no",
+    isMax20: claude === "max20",
+    hasOpenAI: openai === "yes",
+    hasGemini: gemini === "yes",
+    hasCopilot: copilot === "yes",
+    hasOpencodeZen: opencodeZen === "yes",
     hasFoundry: foundry === "yes",
-    auditModel: MODEL_OPTIONS[model],
   }
 }
 
@@ -187,7 +305,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       console.log(`  ${SYMBOLS.bullet} ${err}`)
     }
     console.log()
-    printInfo("Usage: bunx vigilo install --no-tui --foundry=<no|yes> [--model=<sonnet|opus>]")
+    printInfo("Usage: bunx vigilo install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes> --foundry=<no|yes>")
     console.log()
     return 1
   }
@@ -210,6 +328,11 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     printSuccess(`OpenCode ${version ?? ""} detected`)
   }
 
+  if (isUpdate) {
+    const initial = detectedToInitialValues(detected)
+    printInfo(`Current config: Claude=${initial.claude}, Gemini=${initial.gemini}`)
+  }
+
   const config = argsToConfig(args)
 
   printStep(step++, totalSteps, "Adding vigilo plugin...")
@@ -230,11 +353,27 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasFoundry) {
+  if (!config.hasClaude) {
     console.log()
+    console.log(color.bgRed(color.white(color.bold(" WARNING "))))
+    console.log()
+    console.log(color.red(color.bold("  Vigilo is optimized for Claude Opus 4.5.")))
+    console.log(color.red("  Without Claude, you may experience degraded audit quality:"))
+    console.log(color.dim("    • Reduced vulnerability detection accuracy"))
+    console.log(color.dim("    • Weaker PoC generation"))
+    console.log(color.dim("    • Less reliable audit orchestration"))
+    console.log()
+    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
+    console.log()
+  }
+
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
+    printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
+  }
+
+  if (!config.hasFoundry) {
     printWarning("Foundry not configured. Some features may be limited.")
     printInfo("Install Foundry: curl -L https://foundry.paradigm.xyz | bash && foundryup")
-    console.log()
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
@@ -246,6 +385,16 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     `Generate PoC with ${color.cyan("/poc")} command.`,
     "Quick Start"
   )
+
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    printBox(
+      `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
+      (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
+      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ Gemini")}\n` : "") +
+      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+      "Authenticate Your Providers"
+    )
+  }
 
   return 0
 }
@@ -262,7 +411,7 @@ export async function install(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    p.log.info(`Existing configuration detected: Model=${initial.model}`)
+    p.log.info(`Existing configuration detected: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const s = p.spinner()
@@ -299,6 +448,24 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(vigiloResult.configPath)}`)
 
+  if (!config.hasClaude) {
+    console.log()
+    console.log(color.bgRed(color.white(color.bold(" WARNING "))))
+    console.log()
+    console.log(color.red(color.bold("  Vigilo is optimized for Claude Opus 4.5.")))
+    console.log(color.red("  Without Claude, you may experience degraded audit quality:"))
+    console.log(color.dim("    • Reduced vulnerability detection accuracy"))
+    console.log(color.dim("    • Weaker PoC generation"))
+    console.log(color.dim("    • Less reliable audit orchestration"))
+    console.log()
+    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
+    console.log()
+  }
+
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
+    p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
+  }
+
   if (!config.hasFoundry) {
     p.log.warn("Foundry not configured. Some features may be limited.")
     p.note("curl -L https://foundry.paradigm.xyz | bash && foundryup", "Install Foundry")
@@ -316,6 +483,22 @@ export async function install(args: InstallArgs): Promise<number> {
   )
 
   p.outro(color.green("Vigilo is ready!"))
+
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    const providers: string[] = []
+    if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
+    if (config.hasGemini) providers.push(`Google ${color.gray("→ Gemini")}`)
+    if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+
+    console.log()
+    console.log(color.bold("Authenticate Your Providers"))
+    console.log()
+    console.log(`   Run ${color.cyan("opencode auth login")} and select:`)
+    for (const provider of providers) {
+      console.log(`   ${SYMBOLS.bullet} ${provider}`)
+    }
+    console.log()
+  }
 
   return 0
 }

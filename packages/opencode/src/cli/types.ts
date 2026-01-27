@@ -1,16 +1,25 @@
+export type ClaudeSubscription = "no" | "yes" | "max20"
 export type BooleanArg = "no" | "yes"
-export type AuditModel = "sonnet" | "opus"
 
 export interface InstallArgs {
   tui: boolean
+  claude?: ClaudeSubscription
+  openai?: BooleanArg
+  gemini?: BooleanArg
+  copilot?: BooleanArg
+  opencodeZen?: BooleanArg
   foundry?: BooleanArg
-  model?: AuditModel
   skipAuth?: boolean
 }
 
 export interface InstallConfig {
+  hasClaude: boolean
+  isMax20: boolean
+  hasOpenAI: boolean
+  hasGemini: boolean
+  hasCopilot: boolean
+  hasOpencodeZen: boolean
   hasFoundry: boolean
-  auditModel: string
 }
 
 export interface ConfigMergeResult {
@@ -21,8 +30,13 @@ export interface ConfigMergeResult {
 
 export interface DetectedConfig {
   isInstalled: boolean
+  hasClaude: boolean
+  isMax20: boolean
+  hasOpenAI: boolean
+  hasGemini: boolean
+  hasCopilot: boolean
+  hasOpencodeZen: boolean
   hasFoundry: boolean
-  auditModel: string
 }
 
 export interface DoctorOptions {

@@ -87,23 +87,6 @@ export const AuditorOverridesSchema = z.object({
   "token-auditor": AuditorOverrideConfigSchema.optional(),
 })
 
-export const CategoryConfigSchema = z.object({
-  description: z.string().optional(),
-  model: z.string().optional(),
-  variant: z.string().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
-  maxTokens: z.number().optional(),
-  thinking: z.object({
-    type: z.enum(["enabled", "disabled"]),
-    budgetTokens: z.number().optional(),
-  }).optional(),
-  tools: z.record(z.string(), z.boolean()).optional(),
-  prompt_append: z.string().optional(),
-})
-
-export const CategoriesConfigSchema = z.record(z.string(), CategoryConfigSchema)
-
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
@@ -173,8 +156,8 @@ export const TmuxConfigSchema = z.object({
 
 export const VigiloConfigSchema = z.object({
   $schema: z.string().optional(),
+  foundry: z.boolean().optional(),
   auditors: AuditorOverridesSchema.optional(),
-  categories: CategoriesConfigSchema.optional(),
   disabled_auditors: z.array(BuiltinAuditorNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
@@ -196,7 +179,5 @@ export type BuiltinSkillName = z.infer<typeof BuiltinSkillNameSchema>
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
 export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
-export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
-export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>

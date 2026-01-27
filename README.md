@@ -32,21 +32,9 @@ Vigilo is an AI-powered smart contract security auditor that runs inside [OpenCo
 
 ## Installation
 
-### Quick Install (Recommended)
+### OpenCode
 
-```bash
-bunx vigilo install
-```
-
-That's it! The CLI will guide you through the setup interactively.
-
-### Alternative: Non-Interactive Install
-
-```bash
-bunx vigilo install --no-tui --foundry=yes --model=sonnet
-```
-
-### For LLM Agents
+### For LLM Agents (Recommended)
 
 Paste this into your LLM agent session:
 
@@ -55,13 +43,42 @@ Install and configure vigilo by following the instructions here:
 https://raw.githubusercontent.com/PurpleAILAB/Vigilo/main/packages/opencode/docs/installation.md
 ```
 
+### Manual Install
+
+```bash
+bunx vigilo install
+```
+
 ### Claude Code
 
-See [Claude Plugin README](./packages/claude/README.md).
+```bash
+/plugin marketplace add PurpleAILAB/Vigilo
+/plugin install vigilo@Vigilo
+```
 
 ---
 
 See the full [Installation Guide](./packages/opencode/docs/installation.md) for more options.
+
+### Uninstallation
+
+1. Remove the plugin from your OpenCode config:
+
+```bash
+# Edit ~/.config/opencode/opencode.json and remove "vigilo" from the plugin array
+```
+
+2. Remove configuration files:
+
+```bash
+rm -f ~/.config/opencode/vigilo.json
+```
+
+3. Verify removal:
+
+```bash
+opencode --version
+```
 
 ---
 

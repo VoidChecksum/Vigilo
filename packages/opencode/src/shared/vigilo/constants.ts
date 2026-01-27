@@ -1,27 +1,4 @@
-import type { CategoryConfig, AgentDefinition } from "./types"
-
-export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
-  "recon": {
-    model: "anthropic/claude-haiku-4-5",
-    description: "Fast reconnaissance - code/docs analysis",
-    prompt_append: "Focus on speed over depth. Map structure, flows, and patterns quickly.",
-  },
-  "deep-audit": {
-    model: "anthropic/claude-sonnet-4-5",
-    description: "Deep vulnerability analysis",
-    prompt_append: "Thoroughly analyze for security vulnerabilities. Check all edge cases.",
-  },
-  "poc-validation": {
-    model: "anthropic/claude-sonnet-4-5",
-    description: "PoC generation and Foundry test validation",
-    prompt_append: "Generate working PoC tests. Validate with forge test.",
-  },
-  "report": {
-    model: "anthropic/claude-sonnet-4-5",
-    description: "Security report generation",
-    prompt_append: "Generate professional security audit reports.",
-  },
-}
+import type { AgentDefinition } from "./types"
 
 export const DEFAULT_AGENTS: Record<string, AgentDefinition> = {
   "code-analyzer": {

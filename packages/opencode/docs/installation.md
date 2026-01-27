@@ -33,17 +33,33 @@ Follow these steps:
 
 Ask the user these questions to determine CLI options:
 
-1. **Do you have Foundry installed?**
+1. **Do you have a Claude Pro/Max subscription?**
+   - If **no** → `--claude=no`
+   - If **yes (standard)** → `--claude=yes`
+   - If **yes (max20 mode)** → `--claude=max20`
+   - MUST STRONGLY WARN when user said they don't have a Claude subscription. Vigilo's primary auditing agents are optimized for Claude Opus 4.5. Performance may be significantly degraded without it.
+
+2. **Do you have an OpenAI/ChatGPT Plus subscription?**
+   - If **yes** → `--openai=yes`
+   - If **no** → (omit flag, defaults to no)
+
+3. **Do you have a Google Gemini subscription?**
+   - If **yes** → `--gemini=yes`
+   - If **no** → `--gemini=no`
+
+4. **Do you have a GitHub Copilot subscription?**
+   - If **yes** → `--copilot=yes`
+   - If **no** → `--copilot=no`
+
+5. **Do you have access to OpenCode Zen (opencode/ models)?**
+   - If **yes** → `--opencode-zen=yes`
+   - If **no** → (omit flag, defaults to no)
+
+6. **Do you have Foundry installed?**
    - If **yes** → `--foundry=yes`
-   - If **no** → `--foundry=no`
+   - If **no** → Ask user if they want to install Foundry. If yes, install it (see Step 2). Then `--foundry=yes`
+   - If **no** and user declines install → `--foundry=no`
    - If **unsure** → Check with `forge --version`
-
-2. **Which audit model do you prefer?**
-   - **Sonnet** (Recommended, cost-effective) → `--model=sonnet`
-   - **Opus** (Deep analysis, more expensive) → `--model=opus`
-
-3. **Do you have a Claude Pro/Max Subscription?**
-   - If **no** → STRONGLY WARN: Vigilo auditing agents are optimized for Claude. Performance may be degraded without it.
 
 ### Step 1: Install OpenCode (if not installed)
 
@@ -59,36 +75,39 @@ fi
 If OpenCode isn't installed, check the [OpenCode Installation Guide](https://opencode.ai/docs).
 Spawn a subagent to handle installation and report back - to save context.
 
-### Step 2: Check Foundry (recommended)
+### Step 2: Install Foundry (if needed)
+
+If Foundry is not installed and the user agreed to install it in Step 0:
 
 ```bash
-if command -v forge &> /dev/null; then
-    echo "Foundry $(forge --version) is installed"
-else
-    echo "Foundry not found. Some features may be limited."
-    echo "Install: curl -L https://foundry.paradigm.xyz | bash && foundryup"
-fi
+curl -L https://foundry.paradigm.xyz | bash
+source ~/.bashrc  # or source ~/.zshrc
+foundryup
 ```
 
-Foundry provides `forge`, `cast`, and `anvil` - essential tools for smart contract development and testing.
+Verify installation:
+```bash
+forge --version
+```
+
+If the user declined Foundry installation, skip this step. Foundry provides `forge`, `cast`, and `anvil` - essential tools for PoC testing and smart contract development.
 
 ### Step 3: Run the installer
 
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx vigilo install --no-tui --foundry=<yes|no> --model=<sonnet|opus>
+bunx vigilo install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes> --foundry=<yes|no>
 ```
 
 **Examples:**
-- User has Foundry, wants Sonnet: `bunx vigilo install --no-tui --foundry=yes --model=sonnet`
-- User has Foundry, wants Opus: `bunx vigilo install --no-tui --foundry=yes --model=opus`
-- User doesn't have Foundry: `bunx vigilo install --no-tui --foundry=no --model=sonnet`
+- Full setup: `bunx vigilo install --no-tui --claude=max20 --openai=yes --gemini=no --copilot=no --foundry=yes`
+- Minimal: `bunx vigilo install --no-tui --claude=no --gemini=no --copilot=yes --foundry=no`
 
 The CLI will:
 - Register the plugin in `opencode.json`
-- Configure audit model settings
-- Create `vigilo.json` configuration
+- Create `vigilo.json` with model assignments based on your subscriptions
+- Auto-assign optimal models per auditor/category based on provider priority (Native > Copilot > OpenCode Zen)
 
 ### Step 4: Verify Setup
 
@@ -100,7 +119,9 @@ bunx vigilo doctor  # Run health check
 
 ### Step 5: Configure Authentication
 
-Vigilo requires Claude for optimal performance. Configure authentication:
+Configure authentication for your providers. Use interactive terminal like tmux for the following:
+
+#### Anthropic (Claude) — Recommended
 
 ```bash
 opencode auth login
@@ -113,9 +134,9 @@ opencode auth login
 
 ### ⚠️ Warning
 
-**Unless the user explicitly requests it, do not change model settings or disable features.**
+**Unless the user explicitly requests it, do not change model settings or disable features (agents, hooks, MCPs).**
 
-The plugin works perfectly by default. Do not change settings without an explicit request.
+The plugin works perfectly by default. Do not change settings or turn off features without an explicit request.
 
 ### Verify the setup
 
@@ -148,7 +169,7 @@ gh repo star PurpleAILAB/Vigilo
 
 Tell the user the following:
 
-1. **Vigilo auditing agents are optimized for Claude Opus/Sonnet. Using other models may result in degraded analysis quality.**
+1. **Vigilo auditing agents are optimized for Claude Opus/Sonnet but support multi-model fallback.** The best available model is automatically selected based on your connected providers.
 
 2. **Start auditing** with the `/audit` command. Vigilo will analyze your smart contracts for vulnerabilities.
 
@@ -185,7 +206,7 @@ bunx vigilo doctor --json
 | OpenCode not found | Install from https://opencode.ai/docs |
 | Foundry not found | `curl -L https://foundry.paradigm.xyz \| bash && foundryup` |
 | Vigilo not registered | Run `bunx vigilo install` again |
-| Auth failed | Run `opencode auth login` and select Anthropic |
+| Auth failed | Run `opencode auth login` and select your provider |
 
 ### Reset configuration
 

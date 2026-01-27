@@ -60,14 +60,7 @@ export interface Finding {
   pocPath?: string
 }
 
-export interface CategoryConfig {
-  model?: string
-  description?: string
-  prompt_append?: string
-}
-
 export interface VigiloConfig {
-  categories?: Record<string, CategoryConfig>
   agents?: Record<string, AgentDefinition>
   disabled_skills?: string[]
   disabled_agents?: string[]

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "no
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
+import { generateModelConfig } from "./model-fallback"
 
 const PACKAGE_NAME = "vigilo"
 
@@ -151,6 +152,33 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   }
 }
 
+function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
+  const result = { ...target }
+
+  for (const key of Object.keys(source) as Array<keyof T>) {
+    const sourceValue = source[key]
+    const targetValue = result[key]
+
+    if (
+      sourceValue !== null &&
+      typeof sourceValue === "object" &&
+      !Array.isArray(sourceValue) &&
+      targetValue !== null &&
+      typeof targetValue === "object" &&
+      !Array.isArray(targetValue)
+    ) {
+      result[key] = deepMerge(
+        targetValue as Record<string, unknown>,
+        sourceValue as Record<string, unknown>
+      ) as T[keyof T]
+    } else if (sourceValue !== undefined) {
+      result[key] = sourceValue as T[keyof T]
+    }
+  }
+
+  return result
+}
+
 export function writeVigiloConfig(installConfig: InstallConfig): ConfigMergeResult {
   try {
     ensureConfigDir()
@@ -161,12 +189,37 @@ export function writeVigiloConfig(installConfig: InstallConfig): ConfigMergeResu
   const vigiloConfigPath = getVigiloConfig()
 
   try {
-    const config = {
-      auditModel: installConfig.auditModel,
-      foundry: installConfig.hasFoundry,
+    const newConfig = generateModelConfig(installConfig)
+
+    if (existsSync(vigiloConfigPath)) {
+      try {
+        const stat = statSync(vigiloConfigPath)
+        const content = readFileSync(vigiloConfigPath, "utf-8")
+
+        if (stat.size === 0 || content.trim().length === 0) {
+          writeFileSync(vigiloConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: vigiloConfigPath }
+        }
+
+        const existing = JSON.parse(content) as Record<string, unknown>
+        if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+          writeFileSync(vigiloConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: vigiloConfigPath }
+        }
+
+        const merged = deepMerge(existing, newConfig)
+        writeFileSync(vigiloConfigPath, JSON.stringify(merged, null, 2) + "\n")
+      } catch (parseErr) {
+        if (parseErr instanceof SyntaxError) {
+          writeFileSync(vigiloConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: vigiloConfigPath }
+        }
+        throw parseErr
+      }
+    } else {
+      writeFileSync(vigiloConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
     }
 
-    writeFileSync(vigiloConfigPath, JSON.stringify(config, null, 2) + "\n")
     return { success: true, configPath: vigiloConfigPath }
   } catch (err) {
     return { success: false, configPath: vigiloConfigPath, error: formatErrorWithSuggestion(err, "write vigilo config") }
@@ -234,11 +287,39 @@ export async function getFoundryVersion(): Promise<string | null> {
   }
 }
 
+function detectProvidersFromVigiloConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean } {
+  const vigiloConfigPath = getVigiloConfig()
+  if (!existsSync(vigiloConfigPath)) {
+    return { hasOpenAI: true, hasOpencodeZen: true }
+  }
+
+  try {
+    const content = readFileSync(vigiloConfigPath, "utf-8")
+    const vigiloConfig = JSON.parse(content) as Record<string, unknown>
+    if (!vigiloConfig || typeof vigiloConfig !== "object") {
+      return { hasOpenAI: true, hasOpencodeZen: true }
+    }
+
+    const configStr = JSON.stringify(vigiloConfig)
+    const hasOpenAI = configStr.includes('"openai/')
+    const hasOpencodeZen = configStr.includes('"opencode/')
+
+    return { hasOpenAI, hasOpencodeZen }
+  } catch {
+    return { hasOpenAI: true, hasOpencodeZen: true }
+  }
+}
+
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
+    hasClaude: true,
+    isMax20: true,
+    hasOpenAI: true,
+    hasGemini: false,
+    hasCopilot: false,
+    hasOpencodeZen: true,
     hasFoundry: false,
-    auditModel: "anthropic/claude-sonnet-4-5",
   }
 
   const { format, path } = detectConfigFormat()
@@ -261,12 +342,16 @@ export function detectCurrentConfig(): DetectedConfig {
   const vigiloConfigPath = getVigiloConfig()
   if (existsSync(vigiloConfigPath)) {
     try {
-      const vigiloConfig = JSON.parse(readFileSync(vigiloConfigPath, "utf-8"))
-      result.hasFoundry = vigiloConfig.foundry ?? false
-      result.auditModel = vigiloConfig.auditModel ?? "anthropic/claude-sonnet-4-5"
+      const vigiloConfig = JSON.parse(readFileSync(vigiloConfigPath, "utf-8")) as Record<string, unknown>
+      result.hasFoundry = (vigiloConfig.foundry as boolean) ?? false
     } catch {
+      // ignore parse errors
     }
   }
+
+  const { hasOpenAI, hasOpencodeZen } = detectProvidersFromVigiloConfig()
+  result.hasOpenAI = hasOpenAI
+  result.hasOpencodeZen = hasOpencodeZen
 
   return result
 }

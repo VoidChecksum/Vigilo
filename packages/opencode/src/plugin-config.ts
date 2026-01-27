@@ -49,7 +49,6 @@ export function mergeConfigs(
     ...base,
     ...override,
     auditors: deepMerge(base.auditors, override.auditors),
-    categories: deepMerge(base.categories, override.categories),
     disabled_auditors: [
       ...new Set([
         ...(base.disabled_auditors ?? []),
