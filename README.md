@@ -28,6 +28,10 @@
 
 Vigilo is an AI-powered smart contract security auditor that runs inside [OpenCode](https://github.com/anomalyco/opencode). It spawns specialized auditors in parallel to find vulnerabilities and generate validated PoCs.
 
+<p align="center">
+  <img src="assets/opencode.png" alt="Vigilo running in OpenCode" width="720">
+</p>
+
 ---
 
 ## Installation
