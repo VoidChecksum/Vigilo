@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Vigilo">
+  <img src="../../.github/assets/logo.png" alt="Vigilo">
 </p>
 
 # Vigilo
 
-A WEB3 smart contract vibe auditing agent.
+Web3 Smart Contract Security Auditing Agent — Claude Code Plugin
 
-Too much code... too many things to review. So I just built this.
+From Latin *vigilo* — "I watch, I guard." An autonomous security legion inspired by the command structure of the Roman army, deploying specialized agents to find vulnerabilities before attackers do.
 
 ## Installation
 
@@ -27,7 +27,7 @@ Register the marketplace:
 Install the plugin:
 
 ```bash
-/plugin install vigilo
+/plugin install vigilo@Vigilo
 ```
 
 ## Update
@@ -84,7 +84,7 @@ Install the plugin:
 
 ## License
 
-This project is licensed under the [Business Source License 1.1](LICENSE).
+This project is licensed under the [Business Source License 1.1](../../LICENSE).
 
 - **Non-production use**: Free (personal, educational, research, non-commercial security auditing)
 - **Production use**: Requires commercial license

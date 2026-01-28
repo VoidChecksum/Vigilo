@@ -157,7 +157,7 @@ bunx vigilo doctor --verbose
 
 | Issue | Solution |
 |-------|----------|
-| OpenCode not found | Install from https://opencode.ai/docs |
+| OpenCode not found | Install from https://github.com/anomalyco/opencode |
 | Foundry not found | `curl -L https://foundry.paradigm.xyz \| bash && foundryup` |
 | Vigilo not registered | Run `bunx vigilo install` again |
 

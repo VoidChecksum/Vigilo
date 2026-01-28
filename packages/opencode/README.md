@@ -35,17 +35,16 @@ An autonomous security legion for smart contract auditing, built as an OpenCode 
 ### Install Plugin
 
 ```bash
-# Clone and install
-git clone <repo-url> vigilo
-cd vigilo
-npm install
-npm run build
+bunx vigilo install
+```
 
-# Register with OpenCode
-# Add to ~/.config/opencode/opencode.json:
-{
-  "plugin": ["file:///path/to/vigilo/dist/index.js"]
-}
+Or manually:
+
+```bash
+git clone https://github.com/PurpleAILAB/Vigilo.git vigilo
+cd vigilo
+bun install
+bun run build
 ```
 
 ### Install LSP Servers (Optional)
