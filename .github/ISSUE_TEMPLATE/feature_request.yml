@@ -1,0 +1,85 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for Vigilo
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please write your issue in English.**
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting
+      options:
+        - label: I have searched existing issues and discussions to avoid duplicates
+          required: true
+        - label: I have read the [documentation](https://github.com/PurpleAILAB/Vigilo#readme)
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: What problem does this feature solve? What's the use case?
+      placeholder: |
+        Describe the problem or limitation you're experiencing...
+        Example: "As a user, I find it difficult to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you'd like this feature to work
+      placeholder: |
+        Describe your proposed solution in detail...
+        Example: "Add a new auditor that..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: |
+        Describe any alternative solutions you've considered...
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context, mockups, or examples
+      placeholder: |
+        Add any other context, screenshots, code examples, or links...
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of feature is this?
+      options:
+        - New Auditor
+        - New Agent
+        - New Tool
+        - Audit Workflow
+        - Report Generation
+        - Configuration Option
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to contribute to this feature?
+      options:
+        - label: I'm willing to submit a PR for this feature
+        - label: I can help with testing
+        - label: I can help with documentation
