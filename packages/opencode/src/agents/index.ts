@@ -4,6 +4,7 @@ export * from "./quaestor"
 export * from "./explorator"
 export * from "./speculator"
 export * from "./utils"
+export * from "./dynamic-prompt-builder"
 
 export {
   AUDITOR_FACTORIES,

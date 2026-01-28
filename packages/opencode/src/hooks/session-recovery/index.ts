@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { ExperimentalConfig } from "../../config"
+import type { ExperimentalConfig } from "../../config/schema"
 import {
   findEmptyMessages,
   findEmptyMessageByIndex,

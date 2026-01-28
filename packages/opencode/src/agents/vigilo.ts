@@ -1,7 +1,28 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AvailableAuditor, AvailableSkill, AuditorFactory } from "./types"
+import {
+  buildAuditorSelectionGuide,
+  buildSkillEvaluationGuide,
+  buildProtocolMappingFromMetadata,
+  buildDelegationTriggerTable,
+  buildExploratorSection,
+  buildSpeculatorSection,
+  buildAuditorDelegationExamples,
+} from "./dynamic-prompt-builder"
 
-const VIGILO_BASE_PROMPT = `<Role>
+function buildVigiloPrompt(
+  availableAuditors: AvailableAuditor[],
+  availableSkills: AvailableSkill[]
+): string {
+  const exploratorSection = buildExploratorSection(availableAuditors) || "_(No code recon agent available)_"
+  const speculatorSection = buildSpeculatorSection(availableAuditors) || "_(No docs recon agent available)_"
+  const protocolMapping = buildProtocolMappingFromMetadata(availableAuditors) || "_(No auditors available)_"
+  const delegationExamples = buildAuditorDelegationExamples(availableAuditors) || "_(No specialist auditors available)_"
+  const auditorSelectionGuide = buildAuditorSelectionGuide(availableAuditors)
+  const skillEvaluationGuide = buildSkillEvaluationGuide(availableSkills)
+  const delegationTriggerTable = buildDelegationTriggerTable(availableAuditors)
+
+  return `<Role>
 You are "Vigilo" - Web3 Smart Contract Security Auditing Orchestrator.
 
 **Why Vigilo?**: From Latin "to watch, guard" - you watch over smart contracts to find vulnerabilities before attackers do.
@@ -60,13 +81,13 @@ If .vigilo/plan.md does NOT exist and user requests FULL_AUDIT:
 
 ## Phase 1 - Reconnaissance (PARALLEL)
 
-Launch BOTH recon agents simultaneously:
-\`\`\`
-delegate_task(subagent_type="explorator", load_skills=["code-analysis"], prompt="[7-section prompt]", run_in_background=true)
-delegate_task(subagent_type="speculator", load_skills=["docs-analysis"], prompt="[7-section prompt]", run_in_background=true)
-\`\`\`
+Launch recon agents simultaneously:
 
-Wait for both. Read outputs from:
+${exploratorSection}
+
+${speculatorSection}
+
+Wait for all recon agents. Read outputs from:
 - .vigilo/recon/code-findings.md
 - .vigilo/recon/docs-findings.md
 
@@ -96,15 +117,7 @@ Write to: .vigilo/notepad/risk-priorities.md
 
 Based on Protocol Type and risk analysis, select auditors:
 
-| Protocol | Recommended Auditors |
-|----------|---------------------|
-| AMM/DEX | flashloan, oracle, reentrancy |
-| Lending | oracle, logic, flashloan |
-| Vault/ERC4626 | logic, reentrancy, defi |
-| Governance | flashloan, access-control, logic |
-| Bridge | cross-chain, access-control, reentrancy |
-| Staking | logic, reentrancy, defi |
-| Token | token, access-control, logic |
+${protocolMapping}
 
 Launch up to 3 auditors in parallel. Each auditor:
 1. Reads notepad for shared context
@@ -116,13 +129,7 @@ Launch up to 3 auditors in parallel. Each auditor:
 **Auditors do NOT generate PoC code.** They produce detailed attack scenarios.
 **Vigilo (you) generates PoC code and validates via forge_test in Phase 3.**
 
-\`\`\`
-delegate_task(subagent_type="reentrancy-auditor", load_skills=["reentrancy"], prompt="[7-section prompt with notepad context]", run_in_background=true)
-delegate_task(subagent_type="oracle-auditor", load_skills=["oracle"], prompt="[7-section prompt with notepad context]", run_in_background=true)
-delegate_task(subagent_type="logic-auditor", load_skills=["logic-error"], prompt="[7-section prompt with notepad context]", run_in_background=true)
-\`\`\`
-
-If more auditors needed, launch next batch of 3 after first batch completes.
+${delegationExamples}
 
 ## Phase 3 - PoC Generation & Validation (SEQUENTIAL, by Vigilo)
 
@@ -173,6 +180,12 @@ Load skill: report
 Generate submission-ready reports to .vigilo/reports/
 Only include findings that passed Quality Review.
 </Audit_Workflow>
+
+${auditorSelectionGuide}
+
+${skillEvaluationGuide}
+
+${delegationTriggerTable}
 
 <Notepad_System>
 ## Cumulative Audit Intelligence
@@ -442,20 +455,6 @@ contract ExploitTest is Test {
 - Match user's communication style.
 - When user is wrong about scope/severity, raise concern concisely.
 </Style>`
-
-function buildVigiloPrompt(
-  availableAuditors: AvailableAuditor[],
-  availableSkills: AvailableSkill[]
-): string {
-  const auditorSection = availableAuditors.length > 0
-    ? `\n<Available_Auditors>\n${availableAuditors.map(a => `- **${a.name}**: ${a.description}`).join("\n")}\n</Available_Auditors>`
-    : ""
-
-  const skillSection = availableSkills.length > 0
-    ? `\n<Available_Skills>\n${availableSkills.map(s => `- **${s.name}**: ${s.description}`).join("\n")}\n</Available_Skills>`
-    : ""
-
-  return VIGILO_BASE_PROMPT + auditorSection + skillSection
 }
 
 export function createVigiloAgent(
@@ -485,8 +484,18 @@ export const createVigiloAgentFactory: AuditorFactory = (model: string) => {
 export const VIGILO_METADATA = {
   category: "utility" as const,
   cost: "EXPENSIVE" as const,
+  promptAlias: "vigilo",
   triggers: [
     { protocolType: "all", trigger: "Full security audit orchestration" },
+  ],
+  useWhen: [
+    "Full audit requested (/audit)",
+    "PoC generation and validation needed",
+    "Quality review and report generation",
+  ],
+  avoidWhen: [
+    "User wants to scope/plan first (use quaestor)",
+    "Single vulnerability check (use specific auditor directly)",
   ],
   dedicatedSection: "Main orchestrator for audit workflow",
 }

@@ -58,6 +58,81 @@ ${avoidWhen.length > 0 ? `- AVOID WHEN: ${avoidWhen.join("; ")}` : ""}`
 }
 
 // ---------------------------------------------------------------------------
+// Dedicated Agent Section builder (omo pattern: one section per agent)
+// ---------------------------------------------------------------------------
+
+function buildAgentSection(agent: AvailableAuditor): string {
+  const useWhen = agent.metadata?.useWhen ?? []
+  const avoidWhen = agent.metadata?.avoidWhen ?? []
+  const alias = agent.metadata?.promptAlias ?? agent.name
+  const dedicatedSection = agent.metadata?.dedicatedSection ?? agent.description
+
+  const rows: string[] = []
+  for (const w of avoidWhen) {
+    rows.push(`| ${w} |  |`)
+  }
+  for (const w of useWhen) {
+    rows.push(`|  | ${w} |`)
+  }
+
+  const comparisonTable = rows.length > 0
+    ? `| Skip | Use \`${alias}\` |\n|------|${"-".repeat(alias.length + 8)}|\n${rows.join("\n")}`
+    : ""
+
+  return `### ${alias} = ${dedicatedSection}
+
+${comparisonTable}
+
+\`\`\`
+delegate_task(subagent_type="${alias}", prompt="[7-section prompt]", run_in_background=true)
+\`\`\``
+}
+
+export function buildExploratorSection(auditors: AvailableAuditor[]): string {
+  const explorator = auditors.find(a => a.metadata?.promptAlias === "explorator" || a.name === "explorator")
+  if (!explorator) return ""
+  return buildAgentSection(explorator)
+}
+
+export function buildSpeculatorSection(auditors: AvailableAuditor[]): string {
+  const speculator = auditors.find(a => a.metadata?.promptAlias === "speculator" || a.name === "speculator")
+  if (!speculator) return ""
+  return buildAgentSection(speculator)
+}
+
+export function buildVigiloOrchestratorSection(auditors: AvailableAuditor[]): string {
+  const vigilo = auditors.find(a => a.metadata?.promptAlias === "vigilo" || a.name === "vigilo")
+  if (!vigilo) return ""
+  return buildAgentSection(vigilo)
+}
+
+export function buildQuaestorPlannerSection(auditors: AvailableAuditor[]): string {
+  const quaestor = auditors.find(a => a.metadata?.promptAlias === "quaestor" || a.name === "quaestor")
+  if (!quaestor) return ""
+  return buildAgentSection(quaestor)
+}
+
+// ---------------------------------------------------------------------------
+// Specialist Auditor Delegation Examples (dynamic from metadata)
+// ---------------------------------------------------------------------------
+
+export function buildAuditorDelegationExamples(auditors: AvailableAuditor[], maxExamples: number = 3): string {
+  const specialists = auditors.filter(a => a.metadata?.category === "specialist")
+  if (specialists.length === 0) return ""
+
+  const examples = specialists.slice(0, maxExamples).map(a => {
+    const alias = a.metadata?.promptAlias ?? a.name
+    return `delegate_task(subagent_type="${alias}", prompt="[7-section prompt with notepad context]", run_in_background=true)`
+  })
+
+  return `\`\`\`
+${examples.join("\n")}
+\`\`\`
+
+If more auditors needed, launch next batch of ${maxExamples} after first batch completes.`
+}
+
+// ---------------------------------------------------------------------------
 // Skill Evaluation Guide (dynamic)
 // ---------------------------------------------------------------------------
 
@@ -181,6 +256,8 @@ export function buildDynamicVigiloSections(
   skills: AvailableSkill[]
 ): string {
   const sections = [
+    buildExploratorSection(auditors),
+    buildSpeculatorSection(auditors),
     buildAuditorSelectionGuide(auditors),
     buildSkillEvaluationGuide(skills),
   ].filter(Boolean)

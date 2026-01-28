@@ -1,7 +1,22 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AvailableAuditor, AvailableSkill, AuditorFactory } from "./types"
+import {
+  buildAuditorSelectionGuide,
+  buildExploratorSection,
+  buildSpeculatorSection,
+  buildVigiloOrchestratorSection,
+} from "./dynamic-prompt-builder"
 
-const QUAESTOR_BASE_PROMPT = `<Role>
+function buildQuaestorPrompt(
+  availableAuditors: AvailableAuditor[],
+  _availableSkills: AvailableSkill[]
+): string {
+  const exploratorSection = buildExploratorSection(availableAuditors)
+  const speculatorSection = buildSpeculatorSection(availableAuditors)
+  const vigiloSection = buildVigiloOrchestratorSection(availableAuditors)
+  const auditorGuide = buildAuditorSelectionGuide(availableAuditors)
+
+  return `<Role>
 You are "Quaestor" - Pre-Audit Investigator & Planner for Vigilo.
 
 **Why Quaestor?**: From Latin "quaestor" — the Roman investigator and questioner. Before Vigilo's guards deploy, you interrogate the terrain.
@@ -71,6 +86,20 @@ While waiting for user responses, automatically extract what you can:
 - Recent commit activity (how mature is the codebase?)
 - Branch name (feature branch = possibly incomplete code)
 </Auto_Discovery>
+
+<Available_Legion>
+## Vigilo's Available Forces
+
+Quaestor must know what Vigilo has at its disposal to make effective recommendations.
+
+${vigiloSection}
+
+${exploratorSection}
+
+${speculatorSection}
+
+${auditorGuide}
+</Available_Legion>
 
 <Audit_Plan_Output>
 ## Deliverable: Audit Plan (.vigilo/plan.md)
@@ -207,30 +236,6 @@ After writing .vigilo/plan.md:
 - Dense plan > verbose plan.
 - Match user's language (Korean → Korean responses, English → English responses).
 </Style>`
-
-function buildQuaestorPrompt(
-  availableAuditors: AvailableAuditor[],
-  _availableSkills: AvailableSkill[]
-): string {
-  if (availableAuditors.length === 0) return QUAESTOR_BASE_PROMPT
-
-  const auditorTable = availableAuditors.map(a => {
-    const meta = a.metadata
-    const category = meta?.category ?? "unknown"
-    const cost = meta?.cost ?? "unknown"
-    const triggers = meta?.triggers?.map(t => t.trigger).join(", ") ?? ""
-    return `| ${a.name} | ${a.description} | ${category} | ${cost} | ${triggers} |`
-  }).join("\n")
-
-  const section = `\n<Available_Auditors>
-## Auditors Quaestor Can Recommend in Plan
-
-| Name | Description | Category | Cost | Triggers |
-|------|-------------|----------|------|----------|
-${auditorTable}
-</Available_Auditors>`
-
-  return QUAESTOR_BASE_PROMPT + section
 }
 
 export function createQuaestorAgent(
@@ -260,8 +265,20 @@ export const createQuaestorAgentFactory: AuditorFactory = (model: string) => {
 export const QUAESTOR_METADATA = {
   category: "utility" as const,
   cost: "FAST" as const,
+  promptAlias: "quaestor",
   triggers: [
     { protocolType: "all", trigger: "Pre-audit interview and planning" },
   ],
-  dedicatedSection: "Plan agent for audit scoping and interview",
+  useWhen: [
+    "User wants to scope audit first (/plan)",
+    "Unclear what's in scope",
+    "Need structured audit plan before deep analysis",
+    "First time auditing this protocol",
+  ],
+  avoidWhen: [
+    "Scope already defined in scope.txt or .vigilo/plan.md",
+    "User wants immediate audit (use vigilo)",
+    "Targeted vulnerability check (use specific auditor)",
+  ],
+  dedicatedSection: "Pre-audit investigator and planner",
 }

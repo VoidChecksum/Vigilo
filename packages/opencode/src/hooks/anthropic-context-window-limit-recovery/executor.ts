@@ -3,7 +3,7 @@ import type {
   RetryState,
   TruncateState,
 } from "./types";
-import type { ExperimentalConfig } from "../../config";
+import type { ExperimentalConfig } from "../../config/schema";
 import { RETRY_CONFIG, TRUNCATE_CONFIG } from "./types";
 
 import {

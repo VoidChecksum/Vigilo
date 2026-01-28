@@ -6,7 +6,7 @@ import {
   FOUNDRY_COVERAGE_DESCRIPTION,
   CAST_CALL_DESCRIPTION,
 } from "./constants"
-import { log } from "../../shared/utils"
+import { log } from "../../shared"
 
 export const forge_build: ToolDefinition = tool({
   description: FOUNDRY_BUILD_DESCRIPTION,

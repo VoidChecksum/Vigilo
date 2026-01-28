@@ -33,7 +33,7 @@ function getPlatformKey(): string {
 
 function getInstallDir(): string {
   const homeDir = process.env.HOME || process.env.USERPROFILE || "."
-  return join(homeDir, ".cache", "oh-my-opencode", "bin")
+  return join(homeDir, ".cache", "vigilo", "bin")
 }
 
 function getRgPath(): string {

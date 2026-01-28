@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { AutoCompactState, ParsedTokenLimitError } from "./types"
-import type { ExperimentalConfig } from "../../config"
+import type { ExperimentalConfig } from "../../config/schema"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { log } from "../../shared/logger"

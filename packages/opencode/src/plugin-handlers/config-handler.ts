@@ -5,8 +5,7 @@ import {
   discoverOpencodeProjectSkills,
 } from "../features/opencode-skill-loader"
 import type { VigiloConfig } from "../plugin-config"
-import { log } from "../shared"
-import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir"
+import { log, getOpenCodeConfigPaths } from "../shared"
 import type { ModelCacheState } from "../plugin-state"
 import type { AuditorOverrides } from "../agents/types"
 

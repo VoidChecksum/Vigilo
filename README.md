@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Vigilo">
+  <img src=".github/assets/logo.png" alt="Vigilo">
 </p>
 
 <h1 align="center">Vigilo</h1>
@@ -39,7 +39,7 @@ Vigilo is an autonomous security legion for smart contract auditing, inspired by
 | **Centuriones** | Officers (*Centuriones*) | 8 specialist auditors deployed by protocol type |
 
 <p align="center">
-  <img src="assets/opencode.png" alt="Vigilo running in OpenCode" width="720">
+  <img src=".github/assets/opencode.png" alt="Vigilo running in OpenCode" width="720">
 </p>
 
 ---

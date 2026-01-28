@@ -123,6 +123,22 @@ export async function createBuiltinAgents(
   }
 
   if (!disabledSet.has("vigilo")) {
+    availableAuditors.push({
+      name: "vigilo",
+      description: "Web3 Smart Contract Security Auditing Orchestrator",
+      metadata: VIGILO_METADATA,
+    })
+  }
+
+  if (!disabledSet.has("quaestor")) {
+    availableAuditors.push({
+      name: "quaestor",
+      description: "Pre-audit investigator & planner. Interviews users, scopes audits, and produces structured audit plans for Vigilo.",
+      metadata: QUAESTOR_METADATA,
+    })
+  }
+
+  if (!disabledSet.has("vigilo")) {
     const vigiloOverride = agentOverrides["vigilo"]
     const vigiloRequirement = AUDITOR_MODEL_REQUIREMENTS["vigilo"]
     const { model: vigiloModel } = resolveModelWithFallback({

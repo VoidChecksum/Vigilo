@@ -1,11 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import { VigiloConfigSchema, type VigiloConfig } from "./config/schema"
-import { log } from "./shared/logger"
-import { deepMerge } from "./shared/deep-merge"
-import { getOpenCodeConfigDir } from "./shared/opencode-config-dir"
-import { addConfigLoadError } from "./shared/config-errors"
-import { parseJsonc, detectConfigFile } from "./shared/jsonc-parser"
+import { log, deepMerge, getOpenCodeConfigDir, addConfigLoadError, parseJsonc, detectConfigFile } from "./shared"
 
 export function loadConfigFromPath(
   configPath: string,
