@@ -28,7 +28,7 @@ An autonomous security legion for smart contract auditing, built as an OpenCode 
 
 ### Prerequisites
 
-- [OpenCode](https://github.com/sst/opencode) installed
+- [OpenCode](https://github.com/anomalyco/opencode) installed
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) installed
 - Node.js 18+ or Bun
 
@@ -162,12 +162,6 @@ Create `.vigilo/config.json` in your project:
 
 ```json
 {
-  "categories": {
-    "deep-audit": {
-      "model": "anthropic/claude-opus-4-5",
-      "description": "Deep security analysis"
-    }
-  },
   "disabled_skills": [],
   "disabled_agents": []
 }
@@ -182,4 +176,8 @@ Create `.vigilo/config.json` in your project:
 
 ## License
 
-MIT
+[Business Source License 1.1](../../LICENSE)
+
+- **Non-production use**: Free
+- **Production use**: Requires commercial license
+- **Change Date**: 2029-01-21 (converts to Apache-2.0)
