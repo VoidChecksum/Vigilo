@@ -1,6 +1,6 @@
 {
   "name": "vigilo-linux-x64-musl",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Platform-specific binary for vigilo (linux-x64-musl)",
   "license": "BSL-1.1",
   "repository": {

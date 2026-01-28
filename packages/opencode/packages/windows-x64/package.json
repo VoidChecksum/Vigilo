@@ -1,6 +1,6 @@
 {
   "name": "vigilo-windows-x64",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Platform-specific binary for vigilo (windows-x64)",
   "license": "BSL-1.1",
   "repository": {
