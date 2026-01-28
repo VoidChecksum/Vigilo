@@ -1,7 +1,7 @@
 ---
 name: code-analysis
 description: >
-  Auto-loaded by code-analyzer agent during Audit Phase 1 (Reconnaissance).
+  Auto-loaded by explorator agent during Audit Phase 1 (Reconnaissance).
   Provides methodology for: contract structure mapping, execution flow tracing,
   protocol type classification, and entry point identification.
   Output: .vigilo/recon/code-findings.md

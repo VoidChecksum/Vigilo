@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  From Latin "to watch, guard" — Vigilo watches over your smart contracts to find vulnerabilities before attackers do.
+  From Latin <em>vigilo</em> — "I watch, I guard." An autonomous security legion inspired by the command structure of the Roman army, watching over your smart contracts to find vulnerabilities before attackers do.
 </p>
 
 <div align="center">
@@ -26,7 +26,17 @@
 
 ## What is Vigilo?
 
-Vigilo is an AI-powered smart contract security auditor that runs inside [OpenCode](https://github.com/anomalyco/opencode). It spawns specialized auditors in parallel to find vulnerabilities and generate validated PoCs.
+Vigilo is an autonomous security legion for smart contract auditing, inspired by the command structure of the Roman army. It runs inside [OpenCode](https://github.com/anomalyco/opencode), deploying specialized agents in parallel to find vulnerabilities and generate validated PoCs.
+
+### The Legion
+
+| Agent | Latin Role | Mission |
+|-------|-----------|---------|
+| **Vigilo** | Commander (*Imperator*) | Orchestrates the full audit pipeline |
+| **Quaestor** | Investigator (*Quaestor*) | Pre-audit interview & scope planning |
+| **Explorator** | Scout (*Exploratores*) | Code reconnaissance — maps structure and flows |
+| **Speculator** | Intelligence (*Speculatores*) | Documentation intel — extracts design and invariants |
+| **Centuriones** | Officers (*Centuriones*) | 8 specialist auditors deployed by protocol type |
 
 <p align="center">
   <img src="assets/opencode.png" alt="Vigilo running in OpenCode" width="720">
@@ -88,7 +98,7 @@ opencode --version
 
 ## Features
 
-- **Automated Audit Workflow**: Scope → Recon → Deep Analysis → PoC → Report
+- **Automated Audit Workflow**: Scope → Recon (*Exploratores*) → Deep Analysis (*Centuriones*) → PoC → Report
 - **Specialized Auditors**: Reentrancy, Oracle, Access Control, Flashloan, Logic, DeFi, Token, Cross-Chain
 - **Multi-Language Support**: Solidity, Vyper, Cairo, Rust
 - **Foundry Integration**: `forge build`, `forge test`, `forge coverage`
@@ -117,7 +127,7 @@ opencode
 
 ```
 .vigilo/
-├── recon/           # Reconnaissance outputs
+├── recon/           # Explorator & Speculator outputs
 ├── findings/        # Vulnerability findings
 │   ├── high/
 │   └── medium/

@@ -1,36 +1,16 @@
-import { spawn } from "node:child_process"
-
-const isWindows = process.platform === "win32"
+import { spawn } from "bun"
 
 export async function runCommand(cmdArgs: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  return new Promise((resolve, reject) => {
-    const command = isWindows ? "cmd" : cmdArgs[0]
-    const args = isWindows ? ["/c", ...cmdArgs] : cmdArgs.slice(1)
-
-    const proc = spawn(command, args, {
-      shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
-    })
-
-    let stdout = ""
-    let stderr = ""
-
-    proc.stdout.on("data", (data) => {
-      stdout += data.toString()
-    })
-
-    proc.stderr.on("data", (data) => {
-      stderr += data.toString()
-    })
-
-    proc.on("close", (code) => {
-      resolve({ stdout, stderr, exitCode: code ?? 1 })
-    })
-
-    proc.on("error", (err) => {
-      reject(err)
-    })
+  const proc = spawn(cmdArgs, {
+    stdout: "pipe",
+    stderr: "pipe",
   })
+
+  const stdout = await new Response(proc.stdout).text()
+  const stderr = await new Response(proc.stderr).text()
+  const exitCode = await proc.exited
+
+  return { stdout, stderr, exitCode }
 }
 
 export function parseTestSummary(stdout: string): { passed: number; failed: number } {

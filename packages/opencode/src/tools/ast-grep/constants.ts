@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs"
-import { join } from "node:path"
-import { spawnSync } from "node:child_process"
+import { existsSync, statSync } from "fs"
+import { dirname, join } from "path"
+import { createRequire } from "module"
 import { getCachedBinaryPath } from "./downloader"
 
 export const CLI_LANGUAGES = [
@@ -67,7 +67,6 @@ export const LANG_EXTENSIONS: Record<string, string[]> = {
 
 function isValidBinary(filePath: string): boolean {
   try {
-    const { statSync } = require("node:fs")
     return statSync(filePath).size > 10000
   } catch {
     return false
@@ -100,8 +99,6 @@ export function findSgCliPathSync(): string | null {
   }
 
   try {
-    const { createRequire } = require("node:module")
-    const { dirname } = require("node:path")
     const require_ = createRequire(import.meta.url)
     const cliPkgPath = require_.resolve("@ast-grep/cli/package.json")
     const cliDir = dirname(cliPkgPath)
@@ -117,8 +114,6 @@ export function findSgCliPathSync(): string | null {
   const platformPkg = getPlatformPackageName()
   if (platformPkg) {
     try {
-      const { createRequire } = require("node:module")
-      const { dirname } = require("node:path")
       const require_ = createRequire(import.meta.url)
       const pkgPath = require_.resolve(`${platformPkg}/package.json`)
       const pkgDir = dirname(pkgPath)
@@ -193,6 +188,7 @@ export function checkEnvironment(): EnvironmentCheckResult {
     result.cli.available = true
   } else if (cliPath === "sg") {
     try {
+      const { spawnSync } = require("child_process")
       const whichResult = spawnSync(process.platform === "win32" ? "where" : "which", ["sg"], {
         encoding: "utf-8",
         timeout: 5000,

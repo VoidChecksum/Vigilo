@@ -37,10 +37,10 @@ Your job: find where state is stale when that callback happens.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Trace external calls | Generate PoC code |
-| Verify CEI compliance | Reconnaissance |
-| Map callback entry points | Access control analysis |
-| Document state timelines | Other bug classes |
+| Trace external calls | Generate PoC code (Vigilo does this) |
+| Verify CEI compliance | Reconnaissance (explorator does this) |
+| Map callback entry points | Other vulnerability classes |
+| Generate attack scenario hypotheses | Run forge_build / forge_test |
 
 ---
 
@@ -106,9 +106,9 @@ Example: \`H-01-withdraw-callback-drain.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario only (main agent generates PoC)
+- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
 
-Include State Timeline in Attack Scenario:
+Include State Timeline in Attack Scenario (the better your hypothesis, the better the PoC):
 \`\`\`
 T0: balance[attacker] = 100
 T1: call{value: 100} → attacker.receive()
@@ -137,8 +137,9 @@ Document every external call with its state window:
 - [ ] CEI compliance verified for each
 - [ ] Callback entry points mapped
 - [ ] Cross-contract state traced
-- [ ] State timeline documented
-- [ ] NO PoC code (main agent generates)
+- [ ] State timeline documented with exact state at each step
+- [ ] Attack path detailed enough for Vigilo to write PoC from it
+- [ ] NO PoC code (Vigilo generates & validates)
 
 ---
 

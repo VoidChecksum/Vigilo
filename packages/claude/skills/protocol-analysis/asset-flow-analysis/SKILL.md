@@ -1,7 +1,7 @@
 ---
 name: asset-flow-analysis
 description: >
-  Auto-loaded by code-analyzer (Phase 1) and sub-auditors (Phase 2) for asset mapping.
+  Auto-loaded by explorator (Phase 1) and sub-auditors (Phase 2) for asset mapping.
   Framework: "Where's the money? How does it move? Where can it leak?"
   Maps asset storage locations, movement paths, leakage points. Answers attacker's
   first question about protocol funds.

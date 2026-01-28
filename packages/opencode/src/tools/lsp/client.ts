@@ -1,6 +1,6 @@
-import { spawn, type ChildProcess } from "node:child_process"
-import { readFileSync } from "node:fs"
-import { extname, resolve } from "node:path"
+import { spawn, type Subprocess } from "bun"
+import { readFileSync } from "fs"
+import { extname, resolve } from "path"
 import { pathToFileURL } from "node:url"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
@@ -38,18 +38,22 @@ class LSPServerManager {
       }
     }
 
+    // Works on all platforms
     process.on("exit", cleanup)
 
+    // Ctrl+C - works on all platforms
     process.on("SIGINT", () => {
       cleanup()
       process.exit(0)
     })
 
+    // Kill signal - Unix/macOS
     process.on("SIGTERM", () => {
       cleanup()
       process.exit(0)
     })
 
+    // Ctrl+Break - Windows specific
     if (process.platform === "win32") {
       process.on("SIGBREAK", () => {
         cleanup()
@@ -184,8 +188,8 @@ class LSPServerManager {
 export const lspManager = LSPServerManager.getInstance()
 
 export class LSPClient {
-  private proc: ChildProcess | null = null
-  private buffer: Buffer = Buffer.alloc(0)
+  private proc: Subprocess<"pipe", "pipe", "pipe"> | null = null
+  private buffer: Uint8Array = new Uint8Array(0)
   private pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
   private requestIdCounter = 0
   private openedFiles = new Set<string>()
@@ -199,71 +203,81 @@ export class LSPClient {
   ) {}
 
   async start(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.proc = spawn(this.server.command[0], this.server.command.slice(1), {
-        cwd: this.root,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          ...this.server.env,
-        },
-      })
-
-      if (!this.proc) {
-        reject(new Error(`Failed to spawn LSP server: ${this.server.command.join(" ")}`))
-        return
-      }
-
-      this.proc.on("error", (err) => {
-        this.processExited = true
-        reject(new Error(`Failed to spawn LSP server: ${err.message}`))
-      })
-
-      this.proc.on("exit", (code) => {
-        this.processExited = true
-        this.rejectAllPending(`LSP server exited with code ${code}`)
-      })
-
-      this.startReading()
-      this.startStderrReading()
-
-      setTimeout(() => {
-        if (this.proc && this.proc.exitCode !== null) {
-          const stderr = this.stderrBuffer.join("\n")
-          reject(new Error(
-            `LSP server exited immediately with code ${this.proc.exitCode}` + (stderr ? `\nstderr: ${stderr}` : "")
-          ))
-        } else {
-          resolve()
-        }
-      }, 100)
+    this.proc = spawn(this.server.command, {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      cwd: this.root,
+      env: {
+        ...process.env,
+        ...this.server.env,
+      },
     })
+
+    if (!this.proc) {
+      throw new Error(`Failed to spawn LSP server: ${this.server.command.join(" ")}`)
+    }
+
+    this.startReading()
+    this.startStderrReading()
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    if (this.proc.exitCode !== null) {
+      const stderr = this.stderrBuffer.join("\n")
+      throw new Error(
+        `LSP server exited immediately with code ${this.proc.exitCode}` + (stderr ? `\nstderr: ${stderr}` : "")
+      )
+    }
   }
 
   private startReading(): void {
-    if (!this.proc?.stdout) return
+    if (!this.proc) return
 
-    this.proc.stdout.on("data", (chunk: Buffer) => {
-      this.buffer = Buffer.concat([this.buffer, chunk])
-      this.processBuffer()
-    })
-
-    this.proc.stdout.on("end", () => {
-      this.processExited = true
-      this.rejectAllPending("LSP server stdout closed")
-    })
+    const reader = this.proc.stdout.getReader()
+    const read = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) {
+            this.processExited = true
+            this.rejectAllPending("LSP server stdout closed")
+            break
+          }
+          const newBuf = new Uint8Array(this.buffer.length + value.length)
+          newBuf.set(this.buffer)
+          newBuf.set(value, this.buffer.length)
+          this.buffer = newBuf
+          this.processBuffer()
+        }
+      } catch (err) {
+        this.processExited = true
+        this.rejectAllPending(`LSP stdout read error: ${err}`)
+      }
+    }
+    read()
   }
 
   private startStderrReading(): void {
-    if (!this.proc?.stderr) return
+    if (!this.proc) return
 
-    this.proc.stderr.on("data", (chunk: Buffer) => {
-      const text = chunk.toString()
-      this.stderrBuffer.push(text)
-      if (this.stderrBuffer.length > 100) {
-        this.stderrBuffer.shift()
+    const reader = this.proc.stderr.getReader()
+    const read = async () => {
+      const decoder = new TextDecoder()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          const text = decoder.decode(value)
+          this.stderrBuffer.push(text)
+          if (this.stderrBuffer.length > 100) {
+            this.stderrBuffer.shift()
+          }
+        }
+      } catch {
       }
-    })
+    }
+    read()
   }
 
   private rejectAllPending(reason: string): void {
@@ -273,28 +287,46 @@ export class LSPClient {
     }
   }
 
+  private findSequence(haystack: Uint8Array, needle: number[]): number {
+    outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) {
+        if (haystack[i + j] !== needle[j]) continue outer
+      }
+      return i
+    }
+    return -1
+  }
+
   private processBuffer(): void {
-    const CONTENT_LENGTH = "Content-Length: "
-    const HEADER_DELIMITER = "\r\n\r\n"
+    const decoder = new TextDecoder()
+    const CONTENT_LENGTH = [67, 111, 110, 116, 101, 110, 116, 45, 76, 101, 110, 103, 116, 104, 58]
+    const CRLF_CRLF = [13, 10, 13, 10]
+    const LF_LF = [10, 10]
 
     while (true) {
-      const headerStr = this.buffer.toString("utf-8", 0, Math.min(this.buffer.length, 1000))
-      const headerEndIndex = headerStr.indexOf(HEADER_DELIMITER)
-      
-      if (headerEndIndex === -1) break
+      const headerStart = this.findSequence(this.buffer, CONTENT_LENGTH)
+      if (headerStart === -1) break
+      if (headerStart > 0) this.buffer = this.buffer.slice(headerStart)
 
-      const headerPart = headerStr.substring(0, headerEndIndex)
-      const match = headerPart.match(/Content-Length:\s*(\d+)/i)
-      
+      let headerEnd = this.findSequence(this.buffer, CRLF_CRLF)
+      let sepLen = 4
+      if (headerEnd === -1) {
+        headerEnd = this.findSequence(this.buffer, LF_LF)
+        sepLen = 2
+      }
+      if (headerEnd === -1) break
+
+      const header = decoder.decode(this.buffer.slice(0, headerEnd))
+      const match = header.match(/Content-Length:\s*(\d+)/i)
       if (!match) break
 
-      const contentLength = parseInt(match[1], 10)
-      const totalLength = headerEndIndex + HEADER_DELIMITER.length + contentLength
+      const len = parseInt(match[1], 10)
+      const start = headerEnd + sepLen
+      const end = start + len
+      if (this.buffer.length < end) break
 
-      if (this.buffer.length < totalLength) break
-
-      const content = this.buffer.toString("utf-8", headerEndIndex + HEADER_DELIMITER.length, totalLength)
-      this.buffer = this.buffer.slice(totalLength)
+      const content = decoder.decode(this.buffer.slice(start, end))
+      this.buffer = this.buffer.slice(end)
 
       try {
         const msg = JSON.parse(content)
@@ -314,12 +346,13 @@ export class LSPClient {
             handler.resolve(msg.result)
           }
         }
-      } catch {}
+      } catch {
+      }
     }
   }
 
   private send(method: string, params?: unknown): Promise<unknown> {
-    if (!this.proc?.stdin) throw new Error("LSP client not started")
+    if (!this.proc) throw new Error("LSP client not started")
 
     if (this.processExited || this.proc.exitCode !== null) {
       const stderr = this.stderrBuffer.slice(-10).join("\n")
@@ -344,7 +377,7 @@ export class LSPClient {
   }
 
   private notify(method: string, params?: unknown): void {
-    if (!this.proc?.stdin) return
+    if (!this.proc) return
     if (this.processExited || this.proc.exitCode !== null) return
 
     const msg = JSON.stringify({ jsonrpc: "2.0", method, params })
@@ -352,7 +385,7 @@ export class LSPClient {
   }
 
   private respond(id: number | string, result: unknown): void {
-    if (!this.proc?.stdin) return
+    if (!this.proc) return
     if (this.processExited || this.proc.exitCode !== null) return
 
     const msg = JSON.stringify({ jsonrpc: "2.0", id, result })
@@ -500,7 +533,8 @@ export class LSPClient {
       if (result && typeof result === "object" && "items" in result) {
         return result as { items: Diagnostic[] }
       }
-    } catch {}
+    } catch {
+    }
 
     return { items: this.diagnosticsStore.get(uri) ?? [] }
   }
@@ -528,11 +562,12 @@ export class LSPClient {
     return this.proc !== null && !this.processExited && this.proc.exitCode === null
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     try {
       this.notify("shutdown", {})
       this.notify("exit")
-    } catch {}
+    } catch {
+    }
     this.proc?.kill()
     this.proc = null
     this.processExited = true

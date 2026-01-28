@@ -1,16 +1,16 @@
 import type { AgentDefinition } from "./types"
 
 export const DEFAULT_AGENTS: Record<string, AgentDefinition> = {
-  "code-analyzer": {
-    name: "code-analyzer",
+  "explorator": {
+    name: "explorator",
     description: "Fast code reconnaissance specialist",
     model: "anthropic/claude-haiku-4-5",
     tools: ["Read", "Glob", "Grep", "Write"],
     skills: ["code-analysis"],
     color: "green",
   },
-  "docs-analyzer": {
-    name: "docs-analyzer",
+  "speculator": {
+    name: "speculator",
     description: "Documentation analysis specialist",
     model: "anthropic/claude-haiku-4-5",
     tools: ["Read", "Glob", "Grep", "Write"],

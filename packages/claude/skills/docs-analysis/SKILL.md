@@ -1,7 +1,7 @@
 ---
 name: docs-analysis
 description: >
-  Auto-loaded by docs-analyzer agent during Audit Phase 1 (Reconnaissance).
+  Auto-loaded by speculator agent during Audit Phase 1 (Reconnaissance).
   Provides methodology for: documentation analysis, invariant extraction,
   trust assumption mapping, and protocol type classification from docs.
   Output: .vigilo/recon/docs-findings.md

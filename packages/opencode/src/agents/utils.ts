@@ -7,6 +7,9 @@ import type {
   AvailableSkill,
 } from "./types"
 import { createVigiloAgent, VIGILO_METADATA } from "./vigilo"
+import { createQuaestorAgent, QUAESTOR_METADATA } from "./quaestor"
+import { createExplorator, EXPLORATOR_METADATA } from "./explorator"
+import { createSpeculator, SPECULATOR_METADATA } from "./speculator"
 import {
   AUDITOR_FACTORIES,
   AUDITOR_METADATA,
@@ -55,6 +58,39 @@ export async function createBuiltinAgents(
   const availableSkills: AvailableSkill[] = []
 
   const disabledSet = new Set(disabledAgents.map(d => d.toLowerCase()))
+
+  const RECON_AGENTS: Record<string, { factory: (model?: string) => AgentConfig; metadata: AuditorPromptMetadata }> = {
+    "explorator": { factory: createExplorator, metadata: EXPLORATOR_METADATA },
+    "speculator": { factory: createSpeculator, metadata: SPECULATOR_METADATA },
+  }
+
+  for (const [name, { factory, metadata }] of Object.entries(RECON_AGENTS)) {
+    if (disabledSet.has(name.toLowerCase())) continue
+
+    const override = agentOverrides[name as BuiltinAuditorName]
+    if (override?.disable) continue
+
+    const requirement = AUDITOR_MODEL_REQUIREMENTS[name]
+    const { model } = resolveModelWithFallback({
+      userModel: override?.model,
+      fallbackChain: requirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
+
+    let config = factory(model)
+
+    if (override) {
+      config = mergeAgentConfig(config, override)
+    }
+
+    result[name] = config
+    availableAuditors.push({
+      name,
+      description: config.description ?? `${name} recon agent`,
+      metadata,
+    })
+  }
 
   for (const [name, factory] of Object.entries(AUDITOR_FACTORIES)) {
     if (disabledSet.has(name.toLowerCase())) continue
@@ -105,6 +141,25 @@ export async function createBuiltinAgents(
     result["vigilo"] = vigiloConfig
   }
 
+  if (!disabledSet.has("quaestor")) {
+    const quaestorOverride = agentOverrides["quaestor"]
+    const quaestorRequirement = AUDITOR_MODEL_REQUIREMENTS["quaestor"]
+    const { model: quaestorModel } = resolveModelWithFallback({
+      userModel: quaestorOverride?.model,
+      fallbackChain: quaestorRequirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
+
+    let quaestorConfig = createQuaestorAgent(quaestorModel, availableAuditors, availableSkills)
+
+    if (quaestorOverride) {
+      quaestorConfig = mergeAgentConfig(quaestorConfig, quaestorOverride)
+    }
+
+    result["quaestor"] = quaestorConfig
+  }
+
   return result
 }
 
@@ -146,4 +201,4 @@ export function getAuditorsForProtocol(protocolType: string): string[] {
   return PROTOCOL_AUDITOR_MAPPING[normalized] ?? PROTOCOL_AUDITOR_MAPPING.default
 }
 
-export { VIGILO_METADATA }
+export { VIGILO_METADATA, QUAESTOR_METADATA }

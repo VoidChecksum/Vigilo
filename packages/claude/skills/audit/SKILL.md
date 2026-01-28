@@ -34,8 +34,8 @@ Phase 0        Phase 1           Phase 2          Phase 3    Phase 4
 (scope)        (recon)           (audit)          (PoC)      (report)
    │              │                  │               │           │
    ▼              ▼                  ▼               ▼           ▼
- scope.txt ─→ code-analyzer ──┐
-              docs-analyzer ──┼─→ recon/*.md ─→ sub-auditors ─→ findings/ ─→ PoC ─→ report
+ scope.txt ─→ explorator ──┐
+              speculator ──┼─→ recon/*.md ─→ sub-auditors ─→ findings/ ─→ PoC ─→ report
                               │                (max 3 parallel)
                               └─ protocol type detected
 ```
@@ -72,8 +72,8 @@ See [scope-resolution.md](references/scope-resolution.md) for detailed logic.
 Launch both agents in parallel:
 
 ```
-Task(subagent_type="code-analyzer", prompt="Analyze code structure.")
-Task(subagent_type="docs-analyzer", prompt="Analyze documentation.")
+Task(subagent_type="explorator", prompt="Analyze code structure.")
+Task(subagent_type="speculator", prompt="Analyze documentation.")
 ```
 
 **Output:**

@@ -17,14 +17,14 @@ export const AUDITOR_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
   },
-  "code-analyzer": {
+  "explorator": {
     fallbackChain: [
       { providers: ["opencode"], model: "gpt-5-nano" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
     ],
   },
-  "docs-analyzer": {
+  "speculator": {
     fallbackChain: [
       { providers: ["opencode"], model: "gpt-5-nano" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },

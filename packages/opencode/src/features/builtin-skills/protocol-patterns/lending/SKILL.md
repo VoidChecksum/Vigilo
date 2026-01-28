@@ -1,5 +1,5 @@
 ---
-name: Lending Protocol Patterns
+name: lending
 description: >
   Auto-loaded by defi-auditor agent during Phase 2 when analyzing lending protocols.
   Provides patterns for: liquidation logic, interest rate models, collateral management,

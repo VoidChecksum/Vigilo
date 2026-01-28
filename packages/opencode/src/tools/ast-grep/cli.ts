@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { spawn } from "bun"
+import { existsSync } from "fs"
 import {
   getSgCliPath,
   setSgCliPath,
@@ -95,136 +95,128 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
 
   const timeout = DEFAULT_TIMEOUT_MS
 
-  return new Promise((resolve) => {
-    const proc = spawn(cliPath, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-    })
+  const proc = spawn([cliPath, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
 
-    let stdout = ""
-    let stderr = ""
-    let killed = false
-
-    const timeoutId = setTimeout(() => {
-      killed = true
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const id = setTimeout(() => {
       proc.kill()
-      resolve({
+      reject(new Error(`Search timeout after ${timeout}ms`))
+    }, timeout)
+    proc.exited.then(() => clearTimeout(id))
+  })
+
+  let stdout: string
+  let stderr: string
+  let exitCode: number
+
+  try {
+    stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
+    stderr = await new Response(proc.stderr).text()
+    exitCode = await proc.exited
+  } catch (e) {
+    const error = e as Error
+    if (error.message?.includes("timeout")) {
+      return {
         matches: [],
         totalMatches: 0,
         truncated: true,
         truncatedReason: "timeout",
-        error: `Search timeout after ${timeout}ms`,
-      })
-    }, timeout)
+        error: error.message,
+      }
+    }
 
-    proc.stdout.on("data", (data) => {
-      stdout += data.toString()
-    })
-
-    proc.stderr.on("data", (data) => {
-      stderr += data.toString()
-    })
-
-    proc.on("error", async (err) => {
-      clearTimeout(timeoutId)
-      if (killed) return
-
-      const nodeError = err as NodeJS.ErrnoException
-      if (nodeError.code === "ENOENT") {
-        const downloadedPath = await ensureAstGrepBinary()
-        if (downloadedPath) {
-          resolvedCliPath = downloadedPath
-          setSgCliPath(downloadedPath)
-          resolve(runSg(options))
-        } else {
-          resolve({
-            matches: [],
-            totalMatches: 0,
-            truncated: false,
-            error:
-              `ast-grep CLI binary not found.\n\n` +
-              `Auto-download failed. Manual install options:\n` +
-              `  npm install -g @ast-grep/cli\n` +
-              `  cargo install ast-grep --locked\n` +
-              `  brew install ast-grep`,
-          })
-        }
+    const nodeError = e as NodeJS.ErrnoException
+    if (
+      nodeError.code === "ENOENT" ||
+      nodeError.message?.includes("ENOENT") ||
+      nodeError.message?.includes("not found")
+    ) {
+      const downloadedPath = await ensureAstGrepBinary()
+      if (downloadedPath) {
+        resolvedCliPath = downloadedPath
+        setSgCliPath(downloadedPath)
+        return runSg(options)
       } else {
-        resolve({
+        return {
           matches: [],
           totalMatches: 0,
           truncated: false,
-          error: `Failed to spawn ast-grep: ${err.message}`,
-        })
-      }
-    })
-
-    proc.on("close", (exitCode) => {
-      clearTimeout(timeoutId)
-      if (killed) return
-
-      if (exitCode !== 0 && stdout.trim() === "") {
-        if (stderr.includes("No files found")) {
-          resolve({ matches: [], totalMatches: 0, truncated: false })
-          return
+          error:
+            `ast-grep CLI binary not found.\n\n` +
+            `Auto-download failed. Manual install options:\n` +
+            `  npm install -g @ast-grep/cli\n` +
+            `  cargo install ast-grep --locked\n` +
+            `  brew install ast-grep`,
         }
-        if (stderr.trim()) {
-          resolve({ matches: [], totalMatches: 0, truncated: false, error: stderr.trim() })
-          return
-        }
-        resolve({ matches: [], totalMatches: 0, truncated: false })
-        return
       }
+    }
 
-      if (!stdout.trim()) {
-        resolve({ matches: [], totalMatches: 0, truncated: false })
-        return
-      }
+    return {
+      matches: [],
+      totalMatches: 0,
+      truncated: false,
+      error: `Failed to spawn ast-grep: ${error.message}`,
+    }
+  }
 
-      const outputTruncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
-      const outputToProcess = outputTruncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
+  if (exitCode !== 0 && stdout.trim() === "") {
+    if (stderr.includes("No files found")) {
+      return { matches: [], totalMatches: 0, truncated: false }
+    }
+    if (stderr.trim()) {
+      return { matches: [], totalMatches: 0, truncated: false, error: stderr.trim() }
+    }
+    return { matches: [], totalMatches: 0, truncated: false }
+  }
 
-      let matches: CliMatch[] = []
+  if (!stdout.trim()) {
+    return { matches: [], totalMatches: 0, truncated: false }
+  }
+
+  const outputTruncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
+  const outputToProcess = outputTruncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
+
+  let matches: CliMatch[] = []
+  try {
+    matches = JSON.parse(outputToProcess) as CliMatch[]
+  } catch {
+    if (outputTruncated) {
       try {
-        matches = JSON.parse(outputToProcess) as CliMatch[]
-      } catch {
-        if (outputTruncated) {
-          try {
-            const lastValidIndex = outputToProcess.lastIndexOf("}")
-            if (lastValidIndex > 0) {
-              const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
-              if (bracketIndex > 0) {
-                const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
-                matches = JSON.parse(truncatedJson) as CliMatch[]
-              }
-            }
-          } catch {
-            resolve({
-              matches: [],
-              totalMatches: 0,
-              truncated: true,
-              truncatedReason: "max_output_bytes",
-              error: "Output too large and could not be parsed",
-            })
-            return
+        const lastValidIndex = outputToProcess.lastIndexOf("}")
+        if (lastValidIndex > 0) {
+          const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
+          if (bracketIndex > 0) {
+            const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
+            matches = JSON.parse(truncatedJson) as CliMatch[]
           }
-        } else {
-          resolve({ matches: [], totalMatches: 0, truncated: false })
-          return
+        }
+      } catch {
+        return {
+          matches: [],
+          totalMatches: 0,
+          truncated: true,
+          truncatedReason: "max_output_bytes",
+          error: "Output too large and could not be parsed",
         }
       }
+    } else {
+      return { matches: [], totalMatches: 0, truncated: false }
+    }
+  }
 
-      const totalMatches = matches.length
-      const matchesTruncated = totalMatches > DEFAULT_MAX_MATCHES
-      const finalMatches = matchesTruncated ? matches.slice(0, DEFAULT_MAX_MATCHES) : matches
+  const totalMatches = matches.length
+  const matchesTruncated = totalMatches > DEFAULT_MAX_MATCHES
+  const finalMatches = matchesTruncated ? matches.slice(0, DEFAULT_MAX_MATCHES) : matches
 
-      resolve({
-        matches: finalMatches,
-        totalMatches,
-        truncated: outputTruncated || matchesTruncated,
-        truncatedReason: outputTruncated ? "max_output_bytes" : matchesTruncated ? "max_matches" : undefined,
-      })
-    })
-  })
+  return {
+    matches: finalMatches,
+    totalMatches,
+    truncated: outputTruncated || matchesTruncated,
+    truncatedReason: outputTruncated ? "max_output_bytes" : matchesTruncated ? "max_matches" : undefined,
+  }
 }
 
 export function isCliAvailable(): boolean {

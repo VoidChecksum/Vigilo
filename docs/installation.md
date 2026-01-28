@@ -57,8 +57,8 @@ Create `.opencode/vigilo.json` in your project:
 {
   "auditors": {
     "vigilo": { "model": "anthropic/claude-opus-4-5" },
-    "code-analyzer": { "model": "anthropic/claude-sonnet-4-5" },
-    "docs-analyzer": { "model": "anthropic/claude-sonnet-4-5" },
+    "explorator": { "model": "anthropic/claude-sonnet-4-5" },
+    "speculator": { "model": "anthropic/claude-sonnet-4-5" },
     "reentrancy-auditor": { "model": "anthropic/claude-sonnet-4-5" }
   }
 }

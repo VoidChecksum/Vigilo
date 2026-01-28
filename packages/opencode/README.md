@@ -2,7 +2,7 @@
 
 Web3 Smart Contract Security Auditing Orchestrator - OpenCode Plugin
 
-A comprehensive security auditing tool for smart contracts (Solidity, Vyper, Cairo), built as an OpenCode plugin. From Latin "to watch, guard" - Vigilo watches over your smart contracts to find vulnerabilities before attackers do.
+An autonomous security legion for smart contract auditing, built as an OpenCode plugin. From Latin *vigilo* — "I watch, I guard." Inspired by the command structure of the Roman army, Vigilo deploys specialized agents to find vulnerabilities before attackers do.
 
 ## Features
 
@@ -97,8 +97,8 @@ Phase 0        Phase 1           Phase 2          Phase 3    Phase 4
 (scope)        (recon)           (audit)          (PoC)      (report)
    │              │                  │               │           │
    ▼              ▼                  ▼               ▼           ▼
- scope.txt ─→ code-analyzer ──┐
-              docs-analyzer ──┼─→ recon/*.md ─→ sub-auditors ─→ findings/ ─→ PoC ─→ report
+ scope.txt ─→ explorator ─────┐
+              speculator ─────┼─→ recon/*.md ─→ centuriones ──→ findings/ ─→ PoC ─→ report
                               │                (max 3 parallel)
                               └─ protocol type detected
 ```
@@ -118,13 +118,20 @@ Phase 0        Phase 1           Phase 2          Phase 3    Phase 4
 
 | Tool | Description |
 |------|-------------|
-| `delegate_audit` | Spawn specialized auditors |
+| `delegate_task` | Spawn specialized auditors |
 | `background_output` | Get background audit results |
 | `background_cancel` | Cancel running audits |
 | `background_list` | List all audit tasks |
 | `skill` | Load specialized audit skills |
 
-## Specialized Auditors
+## Reconnaissance Agents (Exploratores & Speculatores)
+
+| Agent | Latin Role | Focus |
+|-------|-----------|-------|
+| `explorator` | Scout (*Exploratores*) | Code structure, execution flows, asset locations, protocol type |
+| `speculator` | Intelligence (*Speculatores*) | Protocol design, invariants, trust assumptions from documentation |
+
+## Specialized Auditors (Centuriones)
 
 | Auditor | Focus |
 |---------|-------|
@@ -141,7 +148,7 @@ Phase 0        Phase 1           Phase 2          Phase 3    Phase 4
 
 ```
 .vigilo/
-├── recon/           # Reconnaissance outputs
+├── recon/           # Explorator & Speculator outputs
 ├── findings/        # Vulnerability findings
 │   ├── high/
 │   └── medium/

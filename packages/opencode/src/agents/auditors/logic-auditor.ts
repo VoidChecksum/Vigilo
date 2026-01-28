@@ -37,10 +37,10 @@ Your job: find where that lost precision goes and who can steal it.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Trace calculation flows | Generate PoC code |
-| Test edge case boundaries | Reconnaissance |
-| Verify operation order | Access control analysis |
-| Document precision loss paths | Other bug classes |
+| Trace calculation flows | Generate PoC code (Vigilo does this) |
+| Test edge case boundaries | Reconnaissance (explorator does this) |
+| Verify operation order | Other vulnerability classes |
+| Generate attack scenario hypotheses | Run forge_build / forge_test |
 
 ---
 
@@ -106,12 +106,12 @@ Example: \`H-01-donation-attack-inflated-collateral.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario only (main agent generates PoC)
+- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
 
-In Attack Scenario, include:
-- Calculation flow with operation order
-- Edge case input → expected → actual
-- Accumulated profit from repeated calls
+In Attack Scenario (be specific enough for Vigilo to write PoC):
+- Calculation flow with operation order (exact Solidity expressions)
+- Edge case input → expected → actual (concrete numbers)
+- Accumulated profit from repeated calls (quantified)
 
 ---
 
@@ -121,7 +121,8 @@ In Attack Scenario, include:
 - [ ] Operation order verified (multiply before divide?)
 - [ ] Edge cases tested (0, 1, MAX, first, last)
 - [ ] Invariants checked
-- [ ] NO PoC code (main agent generates)
+- [ ] Attack paths detailed enough for Vigilo to write PoC (concrete numbers!)
+- [ ] NO PoC code (Vigilo generates & validates)
 
 ---
 

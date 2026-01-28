@@ -17,8 +17,8 @@ const AgentPermissionSchema = z.object({
 
 export const BuiltinAuditorNameSchema = z.enum([
   "vigilo",
-  "code-analyzer",
-  "docs-analyzer",
+  "explorator",
+  "speculator",
   "reentrancy-auditor",
   "oracle-auditor",
   "access-control-auditor",
@@ -75,8 +75,8 @@ export const AuditorOverrideConfigSchema = z.object({
 
 export const AuditorOverridesSchema = z.object({
   vigilo: AuditorOverrideConfigSchema.optional(),
-  "code-analyzer": AuditorOverrideConfigSchema.optional(),
-  "docs-analyzer": AuditorOverrideConfigSchema.optional(),
+  "explorator": AuditorOverrideConfigSchema.optional(),
+  "speculator": AuditorOverrideConfigSchema.optional(),
   "reentrancy-auditor": AuditorOverrideConfigSchema.optional(),
   "oracle-auditor": AuditorOverrideConfigSchema.optional(),
   "access-control-auditor": AuditorOverrideConfigSchema.optional(),

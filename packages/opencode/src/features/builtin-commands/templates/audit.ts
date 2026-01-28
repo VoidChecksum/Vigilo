@@ -68,7 +68,7 @@ At audit start, create:
 \`\`\`
 TodoWrite([
   { id: "scope", content: "Phase 0: Resolve scope", status: "pending", priority: "high" },
-  { id: "recon", content: "Phase 1: Reconnaissance (code-analyzer + docs-analyzer)", status: "pending", priority: "high" },
+  { id: "recon", content: "Phase 1: Reconnaissance (explorator + speculator)", status: "pending", priority: "high" },
   { id: "analysis", content: "Phase 2: Deep Analysis (3 protocol-specific auditors)", status: "pending", priority: "high" },
   { id: "poc", content: "Phase 3: PoC Validation", status: "pending", priority: "high" },
   { id: "report", content: "Phase 4: Report Generation", status: "pending", priority: "medium" }
@@ -109,7 +109,7 @@ mkdir -p .vigilo/recon .vigilo/findings/high .vigilo/findings/medium .vigilo/poc
 ### Launch Both Analyzers in Parallel
 
 \`\`\`
-delegate_task(subagent_type="code-analyzer", run_in_background=true, prompt=\\\`
+delegate_task(subagent_type="explorator", load_skills=["code-analysis"], run_in_background=true, prompt=\\\`
 Code Reconnaissance for Smart Contract Audit
 
 1. Analyze contract structure: inheritance, dependencies, entry points
@@ -120,7 +120,7 @@ Code Reconnaissance for Smart Contract Audit
 Output: .vigilo/recon/code-findings.md
 \\\`)
 
-delegate_task(subagent_type="docs-analyzer", run_in_background=true, prompt=\\\`
+delegate_task(subagent_type="speculator", load_skills=["docs-analysis"], run_in_background=true, prompt=\\\`
 Documentation Reconnaissance for Smart Contract Audit
 
 1. Find and analyze: README, docs/, whitepaper, spec
@@ -176,21 +176,21 @@ Extract from recon:
 
 \`\`\`
 // Example for Vault protocol
-delegate_task(subagent_type="logic-auditor", run_in_background=true, prompt=\\\`
+delegate_task(subagent_type="logic-auditor", load_skills=["logic-error", "vault-erc4626"], run_in_background=true, prompt=\\\`
 Protocol Type: Vault/ERC4626
 Read recon: .vigilo/recon/code-findings.md
 Focus: share calculation, first depositor attacks, donation attacks
 Write findings to: .vigilo/findings/{severity}/logic/
 \\\`)
 
-delegate_task(subagent_type="reentrancy-auditor", run_in_background=true, prompt=\\\`
+delegate_task(subagent_type="reentrancy-auditor", load_skills=["reentrancy", "vault-erc4626"], run_in_background=true, prompt=\\\`
 Protocol Type: Vault/ERC4626
 Read recon: .vigilo/recon/code-findings.md
 Focus: CEI violations, cross-function/contract reentrancy, token callbacks
 Write findings to: .vigilo/findings/{severity}/reentrancy/
 \\\`)
 
-delegate_task(subagent_type="defi-auditor", run_in_background=true, prompt=\\\`
+delegate_task(subagent_type="defi-auditor", load_skills=["economic-attack", "vault-erc4626"], run_in_background=true, prompt=\\\`
 Protocol Type: Vault/ERC4626
 Read recon: .vigilo/recon/code-findings.md
 Focus: economic attacks, share inflation, integration risks

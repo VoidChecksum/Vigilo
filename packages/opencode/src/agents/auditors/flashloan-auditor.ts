@@ -37,10 +37,10 @@ Your job: find what breaks when attackers have infinite money.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Trace atomic manipulation | Generate PoC code |
-| Find balance-dependent logic | Reconnaissance |
-| Identify price manipulation | Access control analysis |
-| Document attack flows | Other bug classes |
+| Trace atomic manipulation | Generate PoC code (Vigilo does this) |
+| Find balance-dependent logic | Reconnaissance (explorator does this) |
+| Identify price manipulation vectors | Other vulnerability classes |
+| Generate attack scenario hypotheses | Run forge_build / forge_test |
 
 ---
 
@@ -104,13 +104,13 @@ Example: \`H-01-governance-flashloan-attack.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario only (main agent generates PoC)
+- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
 
-In Attack Scenario, include:
-- Flash loan source (AAVE, dYdX, Balancer)
-- Manipulation target
-- Atomic attack flow
-- Profit extraction method
+In Attack Scenario (be specific enough for Vigilo to write PoC):
+- Flash loan source (AAVE, dYdX, Balancer) and borrow amount
+- Manipulation target (exact contract + function)
+- Atomic attack flow (step-by-step with parameters)
+- Profit extraction method (quantified)
 
 ---
 
@@ -142,8 +142,9 @@ In Attack Scenario, include:
 - [ ] Snapshot mechanisms verified
 - [ ] Price oracle manipulation checked
 - [ ] Governance voting analyzed
-- [ ] Atomic attack flow documented
-- [ ] NO PoC code (main agent generates)
+- [ ] Atomic attack flow documented step-by-step
+- [ ] Attack paths detailed enough for Vigilo to write PoC
+- [ ] NO PoC code (Vigilo generates & validates)
 
 ---
 

@@ -1,8 +1,6 @@
 export * from "./constants"
 export * from "./utils"
 
-export { createCodeAnalyzer, CODE_ANALYZER_METADATA } from "./code-analyzer"
-export { createDocsAnalyzer, DOCS_ANALYZER_METADATA } from "./docs-analyzer"
 export { createReentrancyAuditor, REENTRANCY_AUDITOR_METADATA } from "./reentrancy-auditor"
 export { createOracleAuditor, ORACLE_AUDITOR_METADATA } from "./oracle-auditor"
 export { createAccessControlAuditor, ACCESS_CONTROL_AUDITOR_METADATA } from "./access-control-auditor"
@@ -15,8 +13,6 @@ export { createTokenAuditor, TOKEN_AUDITOR_METADATA } from "./token-auditor"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AuditorPromptMetadata, BuiltinAuditorName } from "../types"
 
-import { createCodeAnalyzer, CODE_ANALYZER_METADATA } from "./code-analyzer"
-import { createDocsAnalyzer, DOCS_ANALYZER_METADATA } from "./docs-analyzer"
 import { createReentrancyAuditor, REENTRANCY_AUDITOR_METADATA } from "./reentrancy-auditor"
 import { createOracleAuditor, ORACLE_AUDITOR_METADATA } from "./oracle-auditor"
 import { createAccessControlAuditor, ACCESS_CONTROL_AUDITOR_METADATA } from "./access-control-auditor"
@@ -28,9 +24,10 @@ import { createTokenAuditor, TOKEN_AUDITOR_METADATA } from "./token-auditor"
 
 export type AuditorFactory = (model?: string) => AgentConfig
 
-export const AUDITOR_FACTORIES: Record<Exclude<BuiltinAuditorName, "vigilo">, AuditorFactory> = {
-  "code-analyzer": createCodeAnalyzer,
-  "docs-analyzer": createDocsAnalyzer,
+/** Specialist auditors only — recon agents (explorator, speculator) are in agents/ */
+export type SpecialistAuditorName = Exclude<BuiltinAuditorName, "vigilo" | "quaestor" | "explorator" | "speculator">
+
+export const AUDITOR_FACTORIES: Record<SpecialistAuditorName, AuditorFactory> = {
   "reentrancy-auditor": createReentrancyAuditor,
   "oracle-auditor": createOracleAuditor,
   "access-control-auditor": createAccessControlAuditor,
@@ -41,9 +38,7 @@ export const AUDITOR_FACTORIES: Record<Exclude<BuiltinAuditorName, "vigilo">, Au
   "token-auditor": createTokenAuditor,
 }
 
-export const AUDITOR_METADATA: Record<Exclude<BuiltinAuditorName, "vigilo">, AuditorPromptMetadata> = {
-  "code-analyzer": CODE_ANALYZER_METADATA,
-  "docs-analyzer": DOCS_ANALYZER_METADATA,
+export const AUDITOR_METADATA: Record<SpecialistAuditorName, AuditorPromptMetadata> = {
   "reentrancy-auditor": REENTRANCY_AUDITOR_METADATA,
   "oracle-auditor": ORACLE_AUDITOR_METADATA,
   "access-control-auditor": ACCESS_CONTROL_AUDITOR_METADATA,

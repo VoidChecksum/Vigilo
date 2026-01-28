@@ -36,10 +36,10 @@ Your job: find what breaks with weird tokens.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Identify token assumptions | Generate PoC code |
-| Check callback handling | Reconnaissance |
-| Verify weird token support | Access control analysis |
-| Document token risks | Other bug classes |
+| Identify token assumptions | Generate PoC code (Vigilo does this) |
+| Check callback handling | Reconnaissance (explorator does this) |
+| Verify weird token support | Other vulnerability classes |
+| Generate attack scenario hypotheses | Run forge_build / forge_test |
 
 ---
 
@@ -117,12 +117,12 @@ Example: \`H-01-fee-on-transfer-mismatch.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario only (main agent generates PoC)
+- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
 
-In Attack Scenario, include:
-- Token type affected
-- Assumption violated
-- Attack steps with specific token behavior
+In Attack Scenario (be specific enough for Vigilo to write PoC):
+- Token type affected (e.g., USDT, stETH, specific weird behavior)
+- Assumption violated (exact code location)
+- Step-by-step attack with specific token behavior and amounts
 - Recommended fix
 
 ---
@@ -153,8 +153,9 @@ In Attack Scenario, include:
 - [ ] Transfer amount assumptions checked
 - [ ] Callback paths traced for reentrancy
 - [ ] Return value handling verified
-- [ ] Weird token scenarios documented
-- [ ] NO PoC code (main agent generates)
+- [ ] Weird token scenarios documented with specific token examples
+- [ ] Attack paths detailed enough for Vigilo to write PoC
+- [ ] NO PoC code (Vigilo generates & validates)
 
 ---
 

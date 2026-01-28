@@ -23,8 +23,9 @@ export interface AuditorPromptMetadata {
 
 export type BuiltinAuditorName =
   | "vigilo"
-  | "code-analyzer"
-  | "docs-analyzer"
+  | "quaestor"
+  | "explorator"
+  | "speculator"
   | "reentrancy-auditor"
   | "oracle-auditor"
   | "access-control-auditor"
