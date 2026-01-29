@@ -96,20 +96,26 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     })
 
     type AgentConfig = Record<string, Record<string, unknown> | undefined>
-    const configAgent = config.agent as AgentConfig | undefined
-
-    if (builtinAgents.vigilo) {
+    
+    // Preserve existing agents from other plugins (e.g., oh-my-opencode)
+    // by adding vigilo agents to the existing config.agent object
+    const existingAgents = (config.agent as AgentConfig) ?? {}
+    
+    // Add vigilo auditor agents without overwriting the entire object
+    for (const [name, agent] of Object.entries(builtinAgents)) {
+      existingAgents[name] = agent
+    }
+    
+    // Hide build and plan (opencode's built-in modes)
+    existingAgents.build = { ...(existingAgents.build ?? {}), mode: "subagent", hidden: true }
+    existingAgents.plan = { ...(existingAgents.plan ?? {}), mode: "subagent", hidden: true }
+    
+    // Only set default_agent if not already set by another plugin
+    if (builtinAgents.vigilo && !(config as { default_agent?: string }).default_agent) {
       ;(config as { default_agent?: string }).default_agent = "vigilo"
     }
 
-    config.agent = {
-      ...builtinAgents,
-      ...configAgent,
-      build: { ...(configAgent?.build ?? {}), mode: "subagent", hidden: true },
-      plan: { ...(configAgent?.plan ?? {}), mode: "subagent", hidden: true },
-    }
-
-    const agentResult = config.agent as AgentConfig
+    const agentResult = existingAgents
 
     config.tools = {
       ...(config.tools as Record<string, unknown>),
