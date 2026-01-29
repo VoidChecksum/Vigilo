@@ -3,8 +3,13 @@
   "version": "0.1.0",
   "description": "Vigilo audit benchmarking pipeline — score against Code4rena ground truth via ScaBench",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PurpleAILAB/Vigilo"
+  },
+  "license": "MIT",
   "bin": {
-    "bench": "./dist/cli.js"
+    "vigilo-bench": "./dist/cli.js"
   },
   "scripts": {
     "build": "bun build src/cli.ts --outdir dist --target node --format esm",
