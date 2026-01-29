@@ -1,5 +1,5 @@
 {
-  "name": "@vigilo/bench",
+  "name": "vigilo-bench",
   "version": "0.1.0",
   "description": "Vigilo audit benchmarking pipeline — score against Code4rena ground truth via ScaBench",
   "type": "module",

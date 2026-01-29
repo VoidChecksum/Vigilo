@@ -194,10 +194,10 @@ jobs:
         id: check
         run: |
           VERSION="${{ needs.publish-main.outputs.version }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/@vigilo/bench/${VERSION}")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/vigilo-bench/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ @vigilo/bench@${VERSION} already published"
+            echo "✓ vigilo-bench@${VERSION} already published"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
