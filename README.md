@@ -153,11 +153,8 @@ opencode
 Measure Vigilo's audit accuracy against verified security reports from Code4rena, Sherlock, and Cantina.
 
 ```bash
-cd packages/bench
-bun install
-
 # Run full benchmark pipeline
-bun bench sherlock_cork-protocol_2025_01 -w -v
+bunx vigilo-bench sherlock_cork-protocol_2025_01 -w -v
 ```
 
 **Pipeline:** checkout → audit → score → report

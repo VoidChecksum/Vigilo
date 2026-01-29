@@ -22,15 +22,17 @@ Benchmark system for measuring Vigilo audit accuracy against Code4rena/Cantina/S
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) runtime
 - [OpenCode](https://github.com/anomalyco/opencode) with Vigilo installed
 - Git
 
 ## Installation
 
 ```bash
-cd packages/bench
-bun install
+# Run directly (recommended)
+bunx vigilo-bench <contest-id>
+
+# Or install globally
+bun add -g vigilo-bench
 ```
 
 ## Quick Start
@@ -38,20 +40,20 @@ bun install
 **One command runs the full pipeline:**
 
 ```bash
-bun bench <contest-id> [options]
+bunx vigilo-bench <contest-id> [options]
 ```
 
 **Examples:**
 
 ```bash
 # Full pipeline with watch mode (see audit in OpenCode TUI)
-bun bench sherlock_cork-protocol_2025_01 -w -v
+bunx vigilo-bench sherlock_cork-protocol_2025_01 -w -v
 
 # Headless mode (automated)
-bun bench code4rena_loopfi_2025_02
+bunx vigilo-bench code4rena_loopfi_2025_02
 
 # Skip audit (use existing .vigilo/)
-bun bench code4rena_loopfi_2025_02 --skip-audit -v
+bunx vigilo-bench code4rena_loopfi_2025_02 --skip-audit -v
 ```
 
 **Options:**
@@ -64,7 +66,7 @@ bun bench code4rena_loopfi_2025_02 --skip-audit -v
 
 ## Pipeline Steps
 
-When you run `bun bench <contest-id>`:
+When you run `bunx vigilo-bench <contest-id>`:
 
 1. **Checkout** - Clone source code from ScaBench dataset + extract ground truth
 2. **Audit** - Run Vigilo audit (headless or watch mode)
@@ -80,7 +82,7 @@ For manual control, you can run each step separately:
 Clone contest source code and extract ground truth.
 
 ```bash
-bun bench checkout code4rena_loopfi_2025_02
+bunx vigilo-bench checkout code4rena_loopfi_2025_02
 ```
 
 ### `score <contest-id>`
@@ -88,8 +90,8 @@ bun bench checkout code4rena_loopfi_2025_02
 Score findings against ground truth.
 
 ```bash
-bun bench score code4rena_loopfi_2025_02 -v
-bun bench score code4rena_loopfi_2025_02 --iterations 5 --batch-size 5
+bunx vigilo-bench score code4rena_loopfi_2025_02 -v
+bunx vigilo-bench score code4rena_loopfi_2025_02 --iterations 5 --batch-size 5
 ```
 
 **Options:**
@@ -105,8 +107,8 @@ bun bench score code4rena_loopfi_2025_02 --iterations 5 --batch-size 5
 Generate markdown reports.
 
 ```bash
-bun bench report --contest code4rena_loopfi_2025_02
-bun bench report --all
+bunx vigilo-bench report --contest code4rena_loopfi_2025_02
+bunx vigilo-bench report --all
 ```
 
 ## Data Structure
@@ -199,7 +201,7 @@ cat data/dataset.json | jq -r '.[] | "\(.project_id) - \(.vulnerabilities | leng
 
 ```bash
 # Use watch mode to debug
-bun bench <contest-id> -w
+bunx vigilo-bench <contest-id> -w
 
 # Or run audit manually
 cd data/sources/<contest-id>
