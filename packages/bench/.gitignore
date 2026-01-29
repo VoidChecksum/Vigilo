@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/sources/
+data/runs/
+data/results/
+data/scores/
+data/truth/
+reports/

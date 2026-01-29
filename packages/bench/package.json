@@ -1,0 +1,26 @@
+{
+  "name": "@vigilo/bench",
+  "version": "0.1.0",
+  "description": "Vigilo audit benchmarking pipeline — score against Code4rena ground truth via ScaBench",
+  "type": "module",
+  "bin": {
+    "bench": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target node --format esm",
+    "dev": "bun run src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.1.39",
+    "commander": "^14.0.2",
+    "picocolors": "^1.1.1",
+    "gray-matter": "^4.0.3",
+    "glob": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.0.10",
+    "typescript": "^5.7.3"
+  }
+}
