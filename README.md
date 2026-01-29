@@ -148,6 +148,24 @@ opencode
 
 ---
 
+## Benchmarking
+
+Measure Vigilo's audit accuracy against verified security reports from Code4rena, Sherlock, and Cantina.
+
+```bash
+cd packages/bench
+bun install
+
+# Run full benchmark pipeline
+bun bench sherlock_cork-protocol_2025_01 -w -v
+```
+
+**Pipeline:** checkout → audit → score → report
+
+See [`packages/bench`](./packages/bench) for full documentation.
+
+---
+
 ## Troubleshooting
 
 ```bash
@@ -160,6 +178,58 @@ bunx vigilo doctor --verbose
 | OpenCode not found | Install from https://github.com/anomalyco/opencode |
 | Foundry not found | `curl -L https://foundry.paradigm.xyz \| bash && foundryup` |
 | Vigilo not registered | Run `bunx vigilo install` again |
+
+---
+
+## Development
+
+For contributors working on Vigilo itself.
+
+### Setup
+
+```bash
+git clone https://github.com/PurpleAILAB/Vigilo.git
+cd vigilo/packages/opencode
+bun install
+bun link
+```
+
+### Development Mode
+
+1. **Configure local plugin path** in `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "plugin": [
+    "D:/path/to/vigilo/packages/opencode"
+  ]
+}
+```
+
+2. **Run watch mode**:
+
+```bash
+bun run dev
+```
+
+3. **Restart OpenCode** to load changes.
+
+### Quick Commands
+
+| Task | Command |
+|------|---------|
+| Build | `bun run build` |
+| Watch mode | `bun run dev` |
+| Test CLI | `bun src/cli/index.ts install` |
+| Run doctor | `bun src/cli/index.ts doctor --verbose` |
+
+### Restore Production Mode
+
+```bash
+bunx vigilo install
+```
+
+This resets the plugin path to `vigilo@latest`.
 
 ---
 

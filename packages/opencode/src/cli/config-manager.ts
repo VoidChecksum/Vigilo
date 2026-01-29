@@ -333,7 +333,11 @@ export function detectCurrentConfig(): DetectedConfig {
   }
 
   const plugins = config.plugin ?? []
-  result.isInstalled = plugins.some((p) => p.startsWith(PACKAGE_NAME))
+  result.isInstalled = plugins.some((p) => 
+    p.startsWith(PACKAGE_NAME) || 
+    p.includes(`/${PACKAGE_NAME}`) ||
+    p.includes(`\\${PACKAGE_NAME}`)
+  )
 
   if (!result.isInstalled) {
     return result

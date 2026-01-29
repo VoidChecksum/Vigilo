@@ -6,6 +6,9 @@ export type { ForgeBuildArgs, ForgeTestArgs, ForgeCoverageArgs, CastCallArgs } f
 export { createDelegateTask } from "./delegate-task"
 export type { DelegateTaskToolOptions, DelegateTaskArgs } from "./delegate-task"
 
+export { createCallVigiloAgent } from "./call-vigilo-agent"
+export type { CallVigiloAgentArgs } from "./call-vigilo-agent"
+
 export { createBackgroundOutput, createBackgroundCancel } from "./background-task"
 export type { BackgroundOutputArgs, BackgroundCancelArgs } from "./background-task"
 

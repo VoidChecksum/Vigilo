@@ -81,22 +81,34 @@ async function checkFoundry(): Promise<CheckResult> {
 }
 
 async function checkSolidityLsp(): Promise<CheckResult> {
-  try {
-    const proc = Bun.spawn(["solidity-ls", "--version"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    await proc.exited
+  // Try multiple possible binary names (LSP servers don't support --version)
+  const binaries = [
+    "nomicfoundation-solidity-language-server",
+    "solidity-language-server", 
+    "vscode-solidity-server",
+  ]
 
-    if (proc.exitCode === 0) {
-      return {
-        id: "solidity-lsp",
-        name: "Solidity LSP",
-        status: "pass",
-        message: "solidity-ls available",
+  const isWindows = process.platform === "win32"
+  const whichCmd = isWindows ? "where" : "which"
+
+  for (const bin of binaries) {
+    try {
+      const proc = Bun.spawn([whichCmd, bin], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      await proc.exited
+
+      if (proc.exitCode === 0) {
+        return {
+          id: "solidity-lsp",
+          name: "Solidity LSP",
+          status: "pass",
+          message: `${bin} available`,
+        }
       }
+    } catch {
     }
-  } catch {
   }
 
   return {

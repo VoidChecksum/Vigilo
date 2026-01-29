@@ -64,6 +64,69 @@ Create `.opencode/vigilo.json` in your project:
 }
 ```
 
+## Development Mode
+
+For contributors developing Vigilo locally.
+
+### Setup
+
+```bash
+git clone https://github.com/PurpleAILAB/Vigilo.git
+cd vigilo/packages/opencode
+bun install
+bun link
+```
+
+### Configure Local Plugin
+
+Edit `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "plugin": [
+    "D:/path/to/vigilo/packages/opencode"
+  ]
+}
+```
+
+Replace with your actual path.
+
+### Development Workflow
+
+**Terminal 1** - Watch mode (auto-rebuild on changes):
+```bash
+cd vigilo/packages/opencode
+bun run dev
+```
+
+**Terminal 2** - Run OpenCode:
+```bash
+opencode
+```
+
+After modifying source files, restart OpenCode to load the updated plugin.
+
+### Quick Commands
+
+| Task | Command |
+|------|---------|
+| Build once | `bun run build` |
+| Watch mode | `bun run dev` |
+| Test CLI directly | `bun src/cli/index.ts install` |
+| Run diagnostics | `bun src/cli/index.ts doctor --verbose` |
+
+### Restore Production Mode
+
+Run the installer again to switch back to the published package:
+
+```bash
+bunx vigilo install
+```
+
+This updates `opencode.json` to use `vigilo@latest`.
+
+---
+
 ## LSP Servers (Optional)
 
 For enhanced code analysis:

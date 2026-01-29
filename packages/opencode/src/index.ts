@@ -31,6 +31,7 @@ import {
   createSlashcommandTool,
   discoverCommandsSync,
   createDelegateTask,
+  createCallVigiloAgent,
   interactive_bash,
   startBackgroundCheck,
   lspManager,
@@ -73,6 +74,22 @@ const VigiloPlugin: Plugin = async (ctx) => {
   const backgroundManager = new BackgroundManager(ctx)
   
   initTaskToastManager(ctx.client)
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tuiClient = ctx.client as any
+  if (tuiClient.tui?.showToast) {
+    tuiClient.tui.showToast({
+      body: {
+        title: "Vigilo Loaded",
+        message: "Plugin initialized successfully. delegate_task and background tools ready.",
+        variant: "info",
+        duration: 3000,
+      },
+    }).catch(() => {})
+    log("[vigilo] Toast API available - sent test toast")
+  } else {
+    log("[vigilo] WARNING: Toast API not available (client.tui.showToast missing)")
+  }
 
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx, { backgroundManager })
   
@@ -92,6 +109,8 @@ const VigiloPlugin: Plugin = async (ctx) => {
     client: ctx.client,
     directory: ctx.directory,
   })
+
+  const callVigiloAgent = createCallVigiloAgent(ctx, backgroundManager)
 
   await initBuiltinSkills()
   const builtinSkills = getBuiltinSkills()
@@ -135,6 +154,7 @@ const VigiloPlugin: Plugin = async (ctx) => {
       ...foundryTools,
       ...backgroundTools,
       delegate_task: delegateTask,
+      call_vigilo_agent: callVigiloAgent,
       skill: skillTool,
       skill_mcp: skillMcpTool,
       slashcommand: slashcommandTool,

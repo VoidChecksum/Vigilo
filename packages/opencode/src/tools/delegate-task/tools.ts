@@ -294,7 +294,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
                 ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
                 task: false,
                 delegate_task: false,
-                call_omo_agent: true,
+                call_vigilo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
             },
@@ -542,7 +542,7 @@ To continue this session: session_id="${task.sessionID}"`
               tools: {
                 task: false,
                 delegate_task: false,
-                call_omo_agent: true,
+                call_vigilo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
             },
