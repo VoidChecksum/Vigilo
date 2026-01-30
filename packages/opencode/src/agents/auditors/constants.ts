@@ -152,3 +152,19 @@ export const COLORS = {
   red: "#EF4444",
   magenta: "#D946EF",
 } as const
+
+/**
+ * Auditor → Skills auto-binding mapping.
+ * When an auditor is called via delegate_task with empty load_skills,
+ * these skills are automatically injected to provide domain expertise.
+ */
+export const AUDITOR_SKILL_MAPPING: Record<string, string[]> = {
+  "reentrancy-auditor": ["reentrancy"],
+  "oracle-auditor": ["oracle"],
+  "access-control-auditor": ["access-control"],
+  "flashloan-auditor": ["flashloan", "economic-attack"],
+  "logic-auditor": ["logic-error"],
+  "token-auditor": ["token"],
+  "cross-chain-auditor": ["cross-chain"],
+  "defi-auditor": ["lending", "staking", "vault-erc4626", "economic-attack"],
+}

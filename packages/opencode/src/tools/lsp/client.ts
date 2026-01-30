@@ -203,7 +203,12 @@ export class LSPClient {
   ) {}
 
   async start(): Promise<void> {
-    this.proc = spawn(this.server.command, {
+    const isWindows = process.platform === "win32"
+    const command = isWindows
+      ? ["cmd", "/c", ...this.server.command]
+      : this.server.command
+
+    this.proc = spawn(command, {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",

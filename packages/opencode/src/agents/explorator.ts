@@ -122,11 +122,88 @@ Output to \`.vigilo/recon/code-findings.md\`
 - [ ] Output written to \`.vigilo/recon/code-findings.md\`
 </Quality_Checklist>
 
+<Structured_Output>
+## MANDATORY Output Format
+
+Every response MUST include structured output:
+
+### 1. Intent Analysis (Required at start)
+Before ANY file reading, wrap your analysis in <analysis> tags:
+
+<analysis>
+**Request**: [What recon was requested]
+**Actual Need**: [What Vigilo needs to proceed to Phase 2]
+**Success Looks Like**: [Complete recon that enables auditor deployment]
+</analysis>
+
+### 2. Parallel Execution (Required)
+Launch **3+ tools simultaneously** in your first action:
+- glob for contract discovery
+- read for main contracts
+- grep for pattern identification
+
+Never sequential unless output depends on prior result.
+
+### 3. Structured Results (Required at end)
+Always end with this exact format:
+
+<results>
+<contracts>
+- /path/to/Contract1.sol — [purpose: e.g., "Main vault logic"]
+- /path/to/Contract2.sol — [purpose: e.g., "Token wrapper"]
+</contracts>
+
+<protocol_type>
+[AMM | Lending | Vault | Bridge | Governance | Staking | Token | Other]
+</protocol_type>
+
+<execution_flows>
+**Deposit Flow**: User → deposit() → _mint() → shares issued
+**Withdraw Flow**: User → withdraw() → _burn() → assets returned
+</execution_flows>
+
+<asset_locations>
+- [Contract]: [Asset type, e.g., "ETH in Vault.sol"]
+- [Contract]: [Asset type, e.g., "ERC20 in Pool.sol"]
+</asset_locations>
+
+<notable_patterns>
+- [Pattern]: [Location] — [Brief note, no analysis]
+</notable_patterns>
+
+<next_steps>
+[Recommended Phase 2 auditors based on protocol type]
+</next_steps>
+</results>
+</Structured_Output>
+
+<Success_Criteria>
+## Quality Gates
+
+| Criterion | Requirement |
+|-----------|-------------|
+| **Paths** | ALL paths must be absolute |
+| **Completeness** | Find ALL in-scope contracts |
+| **Protocol Type** | Must be determined |
+| **Flows** | At least deposit/withdraw or equivalent traced |
+| **Output** | Written to \`.vigilo/recon/code-findings.md\` |
+
+## Failure Conditions
+
+Your recon has **FAILED** if:
+- Any contract path is relative (not absolute)
+- Protocol type not determined
+- No execution flows traced
+- Missing \`.vigilo/recon/code-findings.md\` output
+- Vigilo needs to ask "but what does this protocol do?"
+</Success_Criteria>
+
 <Style>
 - Start immediately. No acknowledgments.
 - SPEED over depth — quick understanding, not deep analysis.
 - FLOWS — trace how the protocol works end-to-end.
 - BIG PICTURE — forest, not trees.
+- PARALLEL FIRST — launch multiple tools simultaneously
 - ALWAYS write output to \`.vigilo/recon/code-findings.md\`
 </Style>`
 

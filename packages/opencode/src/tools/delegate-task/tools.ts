@@ -10,9 +10,21 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, findByNameCaseInsensitive } from "../../shared"
-
+import { AUDITOR_SKILL_MAPPING } from "../../agents/auditors/constants"
+import { AUDIT_CATEGORIES, AUDIT_CATEGORY_PROMPT_APPENDS, AUDIT_CATEGORY_DESCRIPTIONS } from "./constants"
 
 type OpencodeClient = PluginInput["client"]
+
+// Default agent for category-based tasks (similar to OMO's sisyphus-junior)
+const CATEGORY_EXECUTOR_AGENT = "category-executor"
+
+function parseModelString(model: string): { providerID: string; modelID: string } | undefined {
+  const parts = model.split("/")
+  if (parts.length >= 2) {
+    return { providerID: parts[0], modelID: parts.slice(1).join("/") }
+  }
+  return undefined
+}
 
 
 function getMessageDir(sessionID: string): string | null {
@@ -111,22 +123,40 @@ export interface DelegateTaskToolOptions {
 
 export interface BuildSystemContentInput {
   skillContent?: string
+  categoryPromptAppend?: string
 }
 
 export function buildSystemContent(input: BuildSystemContentInput): string | undefined {
-  return input.skillContent || undefined
+  const { skillContent, categoryPromptAppend } = input
+  const parts: string[] = []
+  
+  if (skillContent) parts.push(skillContent)
+  if (categoryPromptAppend) parts.push(categoryPromptAppend)
+  
+  return parts.length > 0 ? parts.join("\n\n") : undefined
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { manager, client, directory, onSyncSessionCreated } = options
 
-  const description = `Spawn agent task with direct agent selection.
+  const categoryNames = Object.keys(AUDIT_CATEGORIES)
+  const categoryList = categoryNames.map(name => {
+    const desc = AUDIT_CATEGORY_DESCRIPTIONS[name]
+    return desc ? `  - ${name}: ${desc}` : `  - ${name}`
+  }).join("\n")
 
-- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
-- subagent_type: Use specific agent directly (e.g., "oracle", "explore")
-- run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
-- session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
-- command: The command that triggered this task (optional, for slash command tracking).
+  const description = `Spawn agent task with category-based or direct agent selection.
+
+MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless continuing a session).
+
+- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["reentrancy"], ["oracle", "flashloan"]).
+- category: Use predefined audit category (auto-selects appropriate model)
+  Available categories:
+${categoryList}
+- subagent_type: Use specific agent directly (e.g., "reentrancy-auditor", "oracle-auditor")
+- run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false.
+- session_id: Existing Task session to continue (from previous task output).
+- command: The command that triggered this task (optional).
 
 **WHEN TO USE session_id:**
 - Task failed/incomplete → session_id with "fix: [specific issue]"
@@ -138,11 +168,12 @@ Prompts MUST be in English.`
   return tool({
     description,
     args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
+      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
-      subagent_type: tool.schema.string().describe("Agent name (e.g., 'oracle', 'explore')."),
+      category: tool.schema.string().optional().describe(`Audit category (${categoryNames.join(", ")}). Mutually exclusive with subagent_type.`),
+      subagent_type: tool.schema.string().optional().describe("Agent name (e.g., 'reentrancy-auditor'). Mutually exclusive with category."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
@@ -157,6 +188,32 @@ Prompts MUST be in English.`
       if (args.load_skills === null) {
         throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
       }
+
+      // Validate category and subagent_type mutual exclusivity
+      if (!args.session_id) {
+        if (args.category && args.subagent_type) {
+          return `Invalid arguments: 'category' and 'subagent_type' are mutually exclusive. Use one or the other.`
+        }
+        if (!args.category && !args.subagent_type) {
+          return `Invalid arguments: Either 'category' or 'subagent_type' is required.`
+        }
+      }
+
+      // Resolve category config
+      let categoryConfig: { model?: string; promptAppend?: string } | undefined
+      if (args.category) {
+        const config = AUDIT_CATEGORIES[args.category]
+        if (!config) {
+          const available = Object.keys(AUDIT_CATEGORIES).join(", ")
+          return `Unknown category: "${args.category}". Available: ${available}`
+        }
+        categoryConfig = {
+          model: config.model,
+          promptAppend: AUDIT_CATEGORY_PROMPT_APPENDS[args.category],
+        }
+        log("[delegate_task] Category resolved", { category: args.category, model: categoryConfig.model })
+      }
+
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
@@ -381,44 +438,63 @@ ${textContent || "(No text output)"}
 To continue this session: session_id="${args.session_id}"`
       }
 
-      if (!args.subagent_type?.trim()) {
-        return `Agent name cannot be empty.`
+      let agentToUse: string
+      if (args.subagent_type?.trim()) {
+        agentToUse = args.subagent_type.trim()
+      } else if (args.category) {
+        agentToUse = CATEGORY_EXECUTOR_AGENT
+      } else {
+        return `Either 'category' or 'subagent_type' is required.`
       }
 
-      let agentToUse: string = args.subagent_type.trim()
+      // Validate agent exists when subagent_type is provided
+      if (agentToUse) {
+        try {
+          const agentsResult = await client.app.agents()
+          type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all" }
+          const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
 
-      // Validate agent exists and is callable (not a primary agent)
-      // Uses case-insensitive matching to allow "Oracle", "oracle", "ORACLE" etc.
-      try {
-        const agentsResult = await client.app.agents()
-        type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all" }
-        const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
+          const callableAgents = agents.filter((a) => a.mode !== "primary")
 
-        const callableAgents = agents.filter((a) => a.mode !== "primary")
+          const matchedAgent = findByNameCaseInsensitive(callableAgents, agentToUse)
+          if (!matchedAgent) {
+            const isPrimaryAgent = findByNameCaseInsensitive(
+              agents.filter((a) => a.mode === "primary"),
+              agentToUse
+            )
+            if (isPrimaryAgent) {
+              return `Cannot call primary agent "${isPrimaryAgent.name}" via delegate_task. Primary agents are top-level orchestrators.`
+            }
 
-        const matchedAgent = findByNameCaseInsensitive(callableAgents, agentToUse)
-        if (!matchedAgent) {
-          const isPrimaryAgent = findByNameCaseInsensitive(
-            agents.filter((a) => a.mode === "primary"),
-            agentToUse
-          )
-          if (isPrimaryAgent) {
-            return `Cannot call primary agent "${isPrimaryAgent.name}" via delegate_task. Primary agents are top-level orchestrators.`
+            const availableAgents = callableAgents
+              .map((a) => a.name)
+              .sort()
+              .join(", ")
+            return `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`
           }
-
-          const availableAgents = callableAgents
-            .map((a) => a.name)
-            .sort()
-            .join(", ")
-          return `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`
+          agentToUse = matchedAgent.name
+        } catch {
+          // If we can't fetch agents, proceed anyway
         }
-        // Use the canonical agent name from registration
-        agentToUse = matchedAgent.name
-      } catch {
-        // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
+
+        // Auto-inject skills for auditors when load_skills is empty
+        const auditorSkills = AUDITOR_SKILL_MAPPING[agentToUse]
+        if (auditorSkills && args.load_skills.length === 0) {
+          log("[delegate_task] Auto-injecting skills for auditor", { agent: agentToUse, skills: auditorSkills })
+          const { resolved, notFound } = await resolveMultipleSkillsAsync(auditorSkills, {})
+          if (notFound.length > 0) {
+            log("[delegate_task] Some auditor skills not found", { notFound })
+          }
+          if (resolved.size > 0) {
+            skillContent = Array.from(resolved.values()).join("\n\n")
+          }
+        }
       }
 
-      const systemContent = buildSystemContent({ skillContent })
+      const systemContent = buildSystemContent({ 
+        skillContent, 
+        categoryPromptAppend: categoryConfig?.promptAppend 
+      })
 
       if (runInBackground) {
         try {
@@ -534,10 +610,13 @@ To continue this session: session_id="${task.sessionID}"`
         })
 
         try {
+          const categoryModel = categoryConfig?.model ? parseModelString(categoryConfig.model) : undefined
+          
           await client.session.prompt({
             path: { id: sessionID },
             body: {
-              agent: agentToUse,
+              ...(agentToUse ? { agent: agentToUse } : {}),
+              ...(categoryModel ? { model: categoryModel } : {}),
               system: systemContent,
               tools: {
                 task: false,
