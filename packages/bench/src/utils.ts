@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import type { ContestRegistry, ScaBenchDataset, BaselineComparison } from "./types.js";
+import type { ContestRegistry, ScaBenchDataset, BaselineComparison, ScaBenchBaseline } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(__dirname, "..");
@@ -89,25 +89,7 @@ export function loadScorerConfig(options?: { iterations?: string; batchSize?: st
   };
 }
 
-export interface ScaBenchBaseline {
-  project: string;
-  timestamp: string;
-  files_analyzed: number;
-  files_skipped: number;
-  total_findings: number;
-  findings: Array<{
-    title: string;
-    description: string;
-    vulnerability_type: string;
-    severity: string;
-    confidence: number;
-    location: string;
-    file: string;
-    id: string;
-    reported_by_model: string;
-    status: string;
-  }>;
-}
+
 
 export function loadBaseline(contestId: string): ScaBenchBaseline | null {
   const baselinePath = resolve(BASELINES_DIR, `baseline_${contestId}.json`);
@@ -118,13 +100,17 @@ export function loadBaseline(contestId: string): ScaBenchBaseline | null {
 }
 
 export function computeBaselineComparison(
-  vigiloExact: number,
-  vigiloDetectionRate: number,
-  truthFindings: Array<{ finding_id: string; title: string; severity: string; description: string }>,
-  baseline: ScaBenchBaseline
+   vigiloExact: number,
+   vigiloDetectionRate: number,
+   truthFindings: Array<{ finding_id: string; title: string; severity: string; description: string }>,
+   baseline: ScaBenchBaseline
 ): BaselineComparison {
-  const baselineDetectionRate = 0;
-  const baselineExactMatches = 0;
+   const baselineDetectionRate = baseline.scoring?.detection_rate ?? 0;
+   const baselineExactMatches = baseline.scoring?.exact_matches ?? 0;
+   
+   if (!baseline.scoring) {
+     console.warn(`[bench] Baseline scoring metadata missing for project "${baseline.project}". Using default values (0).`);
+   }
   
   let delta = vigiloDetectionRate - baselineDetectionRate;
   let comparison: "better" | "worse" | "equal" = "equal";
