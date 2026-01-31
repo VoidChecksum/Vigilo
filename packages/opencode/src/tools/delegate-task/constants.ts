@@ -101,18 +101,26 @@ Your prompt MUST be EXPLICIT:
 
 export const AUDIT_CATEGORIES: Record<string, AuditCategoryConfig> = {
   "deep-analysis": { 
-    model: "anthropic/claude-sonnet-4-5",
+    model: "anthropic/claude-opus-4-5",
+    description: "Thorough vulnerability analysis requiring strong reasoning"
+  },
+  "deep": {
+    model: "anthropic/claude-opus-4-5",
     description: "Thorough vulnerability analysis requiring strong reasoning"
   },
   "pattern-scan": { 
-    model: "anthropic/claude-sonnet-4-5",
+    model: "anthropic/claude-opus-4-5",
     description: "Pattern-based security scanning for known vulnerabilities"
   },
   "poc-generation": { 
-    model: "anthropic/claude-sonnet-4-5",
+    model: "anthropic/claude-opus-4-5",
     description: "Proof of Concept code generation for Foundry tests"
   },
   "quick-check": { 
+    model: "anthropic/claude-haiku-4-5",
+    description: "Fast security checks with limited scope"
+  },
+  "quick": {
     model: "anthropic/claude-haiku-4-5",
     description: "Fast security checks with limited scope"
   },
@@ -120,14 +128,18 @@ export const AUDIT_CATEGORIES: Record<string, AuditCategoryConfig> = {
 
 export const AUDIT_CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "deep-analysis": DEEP_ANALYSIS_PROMPT_APPEND,
+  "deep": DEEP_ANALYSIS_PROMPT_APPEND,
   "pattern-scan": PATTERN_SCAN_PROMPT_APPEND,
   "poc-generation": POC_GENERATION_PROMPT_APPEND,
   "quick-check": QUICK_CHECK_PROMPT_APPEND,
+  "quick": QUICK_CHECK_PROMPT_APPEND,
 }
 
 export const AUDIT_CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "deep-analysis": "Thorough vulnerability analysis requiring strong reasoning",
+  "deep": "Thorough vulnerability analysis requiring strong reasoning",
   "pattern-scan": "Pattern-based security scanning for known vulnerabilities",
   "poc-generation": "Proof of Concept code generation for Foundry tests",
   "quick-check": "Fast security checks with limited scope",
+  "quick": "Fast security checks with limited scope",
 }
