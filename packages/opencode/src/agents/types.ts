@@ -26,6 +26,7 @@ export type BuiltinAuditorName =
   | "quaestor"
   | "explorator"
   | "speculator"
+  | "faber"
   | "reentrancy-auditor"
   | "oracle-auditor"
   | "access-control-auditor"

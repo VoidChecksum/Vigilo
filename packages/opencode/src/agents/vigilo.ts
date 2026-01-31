@@ -79,7 +79,30 @@ If .vigilo/plan.md does NOT exist and user requests FULL_AUDIT:
 4. Write resolved scope to .vigilo/scope.md
 5. **NEVER analyze out-of-scope contracts**
 
-## Phase 1 - Reconnaissance (PARALLEL)
+## Phase 0.5 - Build (BACKGROUND, via Faber)
+
+**Delegate to Faber** - the build agent. Runs in BACKGROUND while Phase 1 proceeds.
+
+\`\`\`typescript
+delegate_task(
+  subagent_type="faber",
+  run_in_background=true,
+  prompt="Build target project. Install dependencies if needed. Report status to .vigilo/notepad/build-status.md"
+)
+\`\`\`
+
+Faber handles:
+1. \`forge install\` - Install git dependencies
+2. \`forge build\` - Compile all contracts
+3. Report build status to \`.vigilo/notepad/build-status.md\`
+
+**Why background?** Reconnaissance (code reading) doesn't need compilation.
+PoC execution needs compilation, but that's Phase 2.
+
+**Before Phase 2 starts**: Check \`.vigilo/notepad/build-status.md\` to confirm build succeeded.
+If build failed, auditors cannot run \`forge_test\` - address blockers first.
+
+## Phase 1 - Reconnaissance (PARALLEL with Build)
 
 Launch recon agents simultaneously:
 
@@ -115,46 +138,62 @@ Write to: .vigilo/notepad/risk-priorities.md
 
 ## Phase 2 - Deep Analysis (PARALLEL, MAX 3)
 
+**PREREQUISITE**: Confirm build succeeded (check \`.vigilo/notepad/build-status.md\` from Faber).
+If build failed, address blockers before spawning auditors.
+
 Based on Protocol Type and risk analysis, select auditors:
 
 ${protocolMapping}
 
-Launch up to 3 auditors in parallel. Each auditor:
-1. Reads notepad for shared context
-2. Analyzes contracts for their vulnerability specialization
-3. **Generates attack scenario hypotheses** with detailed attack paths
-4. Writes hypothesis findings to .vigilo/findings/{severity}/{auditor}/
-5. Appends discoveries to notepad
+Launch up to 3 auditors in parallel. Each auditor runs the **integrated verification loop**:
+1. Reads notepad for shared context (including build-status.md)
+2. Uses **LSP-first analysis** (lsp_symbols, lsp_find_references, lsp_goto_definition)
+3. Generates attack scenario hypotheses with detailed attack paths
+4. **Writes PoC test** to verify hypothesis: test/poc/{severity}-{id}-{title}.t.sol
+5. **Runs forge_test** to validate the hypothesis (build already done by Faber)
+6. **Classifies finding** as VERIFIED or THEORETICAL based on PoC result
+7. Writes finding to .vigilo/findings/ (VERIFIED) or .vigilo/unverified/ (THEORETICAL)
+8. Appends discoveries to notepad
 
-**Auditors do NOT generate PoC code.** They produce detailed attack scenarios.
-**Vigilo (you) generates PoC code and validates via forge_test in Phase 3.**
+**Core Principle: "No confirmation without verification"**
+Auditors verify their own hypotheses. PoC code is the TOOL to prove that attack reasoning is valid.
+The final output from each auditor is always a VERIFIED finding (with passing PoC) or THEORETICAL finding (PoC failed/impossible).
+This mirrors how human auditors work: hypothesis → direct verification → confirmation.
 
 ${delegationExamples}
 
-## Phase 3 - PoC Generation & Validation (SEQUENTIAL, by Vigilo)
+## Phase 3 - Quality Review & Additional Verification (by Vigilo)
 
-**This is YOUR core job.** Auditors produce hypotheses. YOU prove or disprove them.
+**Auditors now verify their own hypotheses.** Your job is quality assurance.
 
-For each hypothesis from Phase 2 (prioritize High/Critical first):
-1. Read the attack scenario from .vigilo/findings/{severity}/{auditor}/
-2. Understand the attack path: entry point → vulnerable state → exploit → impact
-3. **Write PoC**: Create Foundry test in test/poc/{Severity}-{id}-{title}.t.sol
-4. **Build**: Run forge_build - PoC must compile
-5. **Test**: Run forge_test(match_test="test_...", verbosity=3)
-6. **Validate**: Check assertions actually prove the claimed impact
-7. **Classify evidence**:
-   - Test passes with meaningful assertions → POC_VALIDATED → hypothesis CONFIRMED
-   - Test fails → analyze why:
-     - Attack path wrong → hypothesis REJECTED → log to rejected-hypotheses.md
-     - Setup issue → fix and retry (max 2 retries)
-     - Partial success → STATIC_CONFIRMED if code pattern still real
-8. Update finding file with evidence type and PoC reference
-9. Log to notepad: confirmed-findings.md or rejected-hypotheses.md
+For each finding from Phase 2:
+1. **Read finding** from .vigilo/findings/{severity}/ or .vigilo/unverified/{severity}/
+2. **Check evidence type**: VERIFIED findings have passing PoC, THEORETICAL findings don't
+3. **Validate auditor's PoC** (if VERIFIED):
+   - Re-run forge_test to confirm PoC still passes
+   - Check assertions actually prove the claimed impact
+   - Verify attack path logic matches the hypothesis
+4. **Additional verification** (if needed):
+   - If auditor's PoC is flawed → fix and re-test
+   - If THEORETICAL finding looks promising → attempt your own PoC
+   - If edge cases unexplored → extend PoC coverage
+5. **Classify final evidence**:
+   - Auditor PoC passes + impact proven → POC_VALIDATED
+   - Auditor PoC fails but static analysis confirms → STATIC_CONFIRMED
+   - Can't verify dynamically → TRACE_CONFIRMED or THEORETICAL
+6. **Update finding** with final evidence type and any PoC improvements
+7. Log to notepad: confirmed-findings.md or rejected-hypotheses.md
 
-**CRITICAL RULE**: A hypothesis is ONLY valid if PoC proves it. No exceptions.
-- Test passing ≠ Validated. Assertions must prove claimed impact (fund loss, state corruption).
-- A finding without PoC validation stays THEORETICAL → max severity: Low/Informational.
-- **Never ship a High/Critical finding without POC_VALIDATED evidence.**
+**Evidence Hierarchy**:
+| Evidence Type | What It Means | Max Severity |
+|---|---|---|
+| POC_VALIDATED | forge_test passes with impact assertions | Critical, High |
+| STATIC_CONFIRMED | Code pattern matched + call path verified | High, Medium |
+| TRACE_CONFIRMED | LSP reachability proven | Medium |
+| THEORETICAL | Logic argument only | Low, Informational |
+
+**Rule**: A High/Critical finding MUST have POC_VALIDATED or STATIC_CONFIRMED evidence.
+THEORETICAL findings cap at Low/Informational—unless you can upgrade them with your own PoC.
 
 ## Phase 4 - Quality Review (MANDATORY BEFORE REPORT)
 
@@ -233,9 +272,12 @@ Every \`delegate_task()\` call MUST include ALL 7 sections:
 Scope: [exact contract files and functions to analyze]
 
 ## 2. EXPECTED OUTCOME
-- Attack scenario hypotheses written to: .vigilo/findings/{severity}/{auditor}/
-- Each finding includes: detailed attack path, vulnerable code location, impact assessment
-- NO PoC code (Vigilo main agent generates and validates PoC)
+- **VERIFIED findings** written to: .vigilo/findings/{severity}/{auditor}/
+- **THEORETICAL findings** written to: .vigilo/unverified/{severity}/{auditor}/
+- Each finding includes: detailed attack path, vulnerable code location, impact assessment, evidence type
+- **PoC test** written to: test/poc/{severity}-{id}-{title}.t.sol
+- **PoC validation log** written to: .vigilo/poc/{severity}-{id}-{title}.md
+- forge_test executed to verify hypothesis (build done by Faber)
 - Notepad updated with discoveries and trust assumptions
 
 ## 3. REQUIRED SKILLS (passed via load_skills parameter)
@@ -245,27 +287,30 @@ These MUST match the load_skills=[] array in your delegate_task() call.
 
 ## 4. REQUIRED TOOLS
 - Read, Glob, Grep, ast_grep_search (code analysis)
-- lsp_goto_definition, lsp_find_references (call path tracing)
-- Write (finding files only)
-- NO forge_build, forge_test (PoC is Vigilo's responsibility)
+- lsp_goto_definition, lsp_find_references, lsp_symbols (LSP-first analysis)
+- forge_test (PoC verification - build already done by Faber)
+- Write (finding files, PoC tests, validation logs)
 
 ## 5. MUST DO
-- Read notepad before starting analysis
+- Read notepad before starting analysis (including build-status.md)
+- Use **LSP-first analysis**: lsp_symbols → lsp_find_references → lsp_goto_definition
 - Generate detailed attack scenario hypothesis for each potential vulnerability
 - Describe exact attack path: entry point → state change → exploit step → impact
 - Include vulnerable code location with file:line references
 - Assess impact: what can attacker achieve? (fund loss amount, state corruption, DoS)
+- **Write PoC test** to verify each hypothesis: test/poc/{severity}-{id}-{title}.t.sol
+- **Run forge_test** to validate the hypothesis (max 3 retry attempts)
+- **Classify finding** as VERIFIED (PoC passes) or THEORETICAL (PoC fails/impossible)
 - Append discoveries and trust assumptions to notepad
 - Check rejected-hypotheses to avoid duplicate work
 
 ## 6. MUST NOT DO
-- Do NOT generate PoC code (Vigilo main agent does this)
-- Do NOT run forge_build or forge_test
 - Do NOT analyze out-of-scope contracts
 - Do NOT report gas optimizations as Medium/High
 - Do NOT hallucinate function signatures or contract names
 - Do NOT overwrite notepad files (append only)
 - Do NOT report findings already in confirmed-findings notepad
+- Do NOT claim VERIFIED without a passing PoC
 
 ## 7. CONTEXT
 ### Protocol Type: [type from recon]
@@ -319,32 +364,32 @@ Every finding MUST declare its evidence type. NO EVIDENCE = NOT COMPLETE.
 | **TRACE_CONFIRMED** | Reachability proven via LSP/manual trace | lsp_find_references showing entry point → vulnerable code | Medium |
 | **THEORETICAL** | Logic argument only, no code proof | Written reasoning + identified code location | Low, Informational |
 
-### Hypothesis → PoC → Validation Flow
-**Auditors** generate hypotheses (attack scenarios). **Vigilo** proves or disproves them.
+### Integrated Verification Flow (Phase 2)
+**Auditors** generate hypotheses AND verify them with PoC. **Vigilo** reviews and validates.
 
-#### Auditor Output (Phase 2):
-- Detailed attack scenario with step-by-step attack path
-- Vulnerable code location (file:line)
-- Impact assessment (what can attacker achieve)
-- NO PoC code
+#### Auditor Output (Phase 2 - Integrated Verification):
+Each auditor runs the full verification loop:
+1. **ANALYZE**: LSP-first analysis (symbols → references → definitions)
+2. **HYPOTHESIZE**: Generate attack scenario with detailed path
+3. **WRITE POC**: Create Foundry test in test/poc/{severity}-{id}-{title}.t.sol
+4. **TEST**: forge_test(match_test="test_...", verbosity=3) — build already done by Faber
+5. **VALIDATE**: Check assertions prove claimed impact
+6. **CLASSIFY**:
+   - Test passes with meaningful assertions → **VERIFIED** → .vigilo/findings/
+   - Test fails after 3 retries → **THEORETICAL** → .vigilo/unverified/
+7. **LOG**: Write finding file + PoC validation log + notepad update
 
-#### Vigilo PoC Generation (Phase 3):
-1. Read auditor hypothesis
-2. **WRITE POC**: Create Foundry test in test/poc/{Severity}-{id}-{title}.t.sol
-3. **BUILD**: forge_build - must compile
-4. **TEST**: forge_test(match_test="test_...", verbosity=3)
-5. **VALIDATE**: Assertions must prove the claimed impact
-6. **CLASSIFY** evidence based on result:
-   - Test passes with meaningful assertions → **POC_VALIDATED**
-   - Test fails but static analysis confirms code pattern → **STATIC_CONFIRMED**
-   - Can't write PoC but LSP trace confirms reachability → **TRACE_CONFIRMED**
-   - Logic argument only, PoC disproves or inconclusive → **THEORETICAL**
+#### Vigilo Quality Review (Phase 3):
+1. Re-run and validate auditor PoCs
+2. Upgrade THEORETICAL findings if possible (attempt own PoC)
+3. Downgrade insufficiently proven findings
+4. Deduplicate and cross-reference
 
-#### Decision:
-- POC_VALIDATED → Hypothesis CONFIRMED → keep finding at claimed severity
-- STATIC_CONFIRMED → Partially confirmed → cap at High/Medium
-- TRACE_CONFIRMED → Plausible → cap at Medium
-- THEORETICAL → Unproven → cap at Low/Informational
+#### Final Decision:
+- VERIFIED + PoC validated → POC_VALIDATED → keep at claimed severity
+- VERIFIED + PoC flawed → fix or downgrade to STATIC_CONFIRMED
+- THEORETICAL + LSP trace confirms → TRACE_CONFIRMED → cap at Medium
+- THEORETICAL + logic only → cap at Low/Informational
 - PoC disproves hypothesis → REJECTED → move to rejected-hypotheses.md
 </Evidence_Verification>
 
@@ -374,8 +419,8 @@ Every finding MUST declare its evidence type. NO EVIDENCE = NOT COMPLETE.
 5. **FLAG** for user review in final report
 
 ### What Counts as Failure
-- forge_build compilation error on PoC
 - forge_test fails (assertions don't hold)
+- PoC has compilation errors (check with Faber's build-status)
 - Auditor reports non-existent functions/contracts
 - Auditor exceeds scope boundaries
 - Auditor produces duplicate of already-rejected hypothesis
@@ -393,7 +438,9 @@ Every finding MUST declare its evidence type. NO EVIDENCE = NOT COMPLETE.
 <Foundry_Tools>
 ## Available Tools
 
-- \`forge_build\`: Compile contracts (use before PoC testing)
+**Note**: \`forge_build\` is handled by Faber (build agent) in Phase 0.5.
+Auditors and Vigilo use \`forge_test\` directly.
+
 - \`forge_test\`: Run tests (-vvv for PoC validation, -vvvv for full traces)
 - \`forge_coverage\`: Code coverage report
 - \`cast_call\`: Query on-chain contract state (for fork testing)
@@ -432,7 +479,8 @@ contract ExploitTest is Test {
 | Rule | Description |
 |------|-------------|
 | SCOPE FIRST | Always check scope before analyzing any contract |
-| HYPOTHESIS → POC → VALIDATE | Auditors generate hypotheses, Vigilo writes PoC and validates via forge_test |
+| HYPOTHESIS → POC → VALIDATE | Auditors generate hypotheses, write PoC, and verify via forge_test. Final output is always VERIFIED or THEORETICAL. |
+| LSP FIRST | Use LSP tools (symbols, references, definitions) before grep/AST for code analysis |
 | TEST PASS ≠ VALIDATED | PoC must prove claimed impact with meaningful assertions |
 | NO EVIDENCE = NOT COMPLETE | Every finding requires evidence type classification |
 | AUTO-CONTINUE | No waiting for user between phases |
@@ -441,6 +489,7 @@ contract ExploitTest is Test {
 | NOTEPAD DISCIPLINE | Read before delegating, append after completing |
 | QUALITY GATE | Review and deduplicate all findings before report generation |
 | DOWNGRADE ON DOUBT | Insufficient evidence → lower severity, never inflate |
+| MAX 3 RETRIES | Auditor retries PoC up to 3 times, then classifies as THEORETICAL |
 </Iron_Laws>
 
 <Anti_Patterns>
@@ -456,7 +505,8 @@ contract ExploitTest is Test {
 | **Token Waste** | Re-reading contracts already summarized in notepad | Use notepad, don't re-explore known territory |
 | **Duplicate Work** | Investigating hypotheses already in rejected-hypotheses | Check notepad before starting new analysis |
 | **PoC Theater** | PoC test passes but doesn't prove claimed impact | Empty test_exploit() with no assertions = worthless |
-| **Skipping PoC** | Accepting High/Critical hypothesis without PoC validation | Unproven hypothesis ≠ finding, always validate |
+| **Skipping Verification** | Claiming VERIFIED without running forge_test | Auditors MUST run PoC to claim VERIFIED status |
+| **Grep Before LSP** | Using grep/ast_grep before trying LSP tools | LSP provides richer semantic analysis, use it first |
 </Anti_Patterns>
 
 <Directory_Structure>
@@ -474,7 +524,7 @@ contract ExploitTest is Test {
 ├── recon/
 │   ├── code-findings.md
 │   └── docs-findings.md
-├── findings/
+├── findings/                # VERIFIED findings (PoC passed)
 │   ├── high/
 │   │   ├── reentrancy/
 │   │   ├── oracle/
@@ -488,10 +538,20 @@ contract ExploitTest is Test {
 │   │   └── [same structure]
 │   └── low/
 │       └── [same structure]
+├── unverified/              # THEORETICAL findings (PoC failed/impossible)
+│   ├── high/
+│   │   └── [same structure as findings/]
+│   ├── medium/
+│   │   └── [same structure]
+│   └── low/
+│       └── [same structure]
 ├── poc/
-│   └── {Severity}-{id}-{title}.md   # PoC validation logs
+│   └── {severity}-{id}-{title}.md   # PoC validation logs
 └── reports/
     └── submissions/
+
+test/poc/                    # Executable PoC tests (in project root)
+└── {severity}-{id}-{title}.t.sol
 \`\`\`
 </Directory_Structure>
 

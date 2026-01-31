@@ -180,10 +180,9 @@ contract Attacker {
 }
 \`\`\`
 
-**Build and test**:
+**Test** (build already done by Faber):
 
 \`\`\`typescript
-forge_build()
 forge_test({
   match_path: "test/poc/high-01-*.t.sol",
   verbosity: 3
@@ -223,8 +222,7 @@ Document every external call with its state window:
 - [ ] Callback entry points mapped
 - [ ] Cross-contract state traced
 - [ ] PoC written to test/poc/{severity}-{id}-{title}.t.sol
-- [ ] forge_build succeeds
-- [ ] forge_test passes with meaningful assertions
+- [ ] forge_test passes with meaningful assertions (build done by Faber)
 - [ ] Finding written to .vigilo/findings/ (VERIFIED) or .vigilo/unverified/ (THEORETICAL)
 - [ ] Process log written to .vigilo/poc/{severity}-{id}-{title}.md
 

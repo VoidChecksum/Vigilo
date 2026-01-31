@@ -24,8 +24,8 @@ import { createTokenAuditor, TOKEN_AUDITOR_METADATA } from "./token-auditor"
 
 export type AuditorFactory = (model?: string) => AgentConfig
 
-/** Specialist auditors only — recon agents (explorator, speculator) are in agents/ */
-export type SpecialistAuditorName = Exclude<BuiltinAuditorName, "vigilo" | "quaestor" | "explorator" | "speculator">
+/** Specialist auditors only — utility agents (vigilo, quaestor, explorator, speculator, faber) are in agents/ */
+export type SpecialistAuditorName = Exclude<BuiltinAuditorName, "vigilo" | "quaestor" | "explorator" | "speculator" | "faber">
 
 export const AUDITOR_FACTORIES: Record<SpecialistAuditorName, AuditorFactory> = {
   "reentrancy-auditor": createReentrancyAuditor,

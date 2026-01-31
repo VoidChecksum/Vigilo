@@ -155,14 +155,7 @@ For EACH hypothesis you generate:
 - Include setup, attack execution, and assertions
 - Use meaningful assertion messages
 
-### Step 3: Build
-\`\`\`bash
-forge_build()
-\`\`\`
-- If build fails: Fix compilation errors, retry
-- Maximum 3 build attempts
-
-### Step 4: Test Execution
+### Step 3: Test Execution (Build already done by Faber)
 \`\`\`bash
 forge_test(match_path="test/poc/{severity}-{id}*.sol", verbosity=3)
 \`\`\`
@@ -238,20 +231,8 @@ Filename: \`{Severity}-{id}-{kebab-case-title}.md\`
 <Foundry_Tools>
 ## Foundry Tools Usage
 
-You have access to these Foundry tools for PoC verification:
-
-### forge_build
-Compiles Solidity contracts.
-
-**Usage**:
-\`\`\`typescript
-forge_build({
-  optimize: true,        // Enable optimizer
-  optimizer_runs: 200   // Optimizer runs (default: 200)
-})
-\`\`\`
-
-**When to use**: After writing PoC test file to \`test/poc/*.t.sol\`
+**IMPORTANT**: Project is already compiled by Faber (build agent).
+You only need \`forge_test\` to verify your PoC hypotheses.
 
 ### forge_test
 Runs tests with configurable verbosity.
@@ -274,9 +255,9 @@ forge_test({
 - 4 (-vvvv): Full stack traces
 - 5 (-vvvvv): Debug mode with all traces
 
-**When to use**: After successful \`forge_build\`
+**When to use**: After writing PoC test file to \`test/poc/*.t.sol\`
 
-### forge_coverage
+### forge_coverage (Optional)
 Generates code coverage report.
 
 **Usage**:
@@ -296,8 +277,7 @@ BLOCKED ACTIONS (will fail if attempted):
 - Spawning other auditors: BLOCKED
 
 REQUIRED ACTIONS:
-- forge_build: Use to compile PoC tests
-- forge_test: Use to verify hypotheses
+- forge_test: Use to verify hypotheses (project already built by Faber)
 - Write PoC code in test/poc/
 - Write findings to .vigilo/findings/ (VERIFIED) or .vigilo/unverified/ (THEORETICAL)
 

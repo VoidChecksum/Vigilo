@@ -3,6 +3,7 @@ export * from "./vigilo"
 export * from "./quaestor"
 export * from "./explorator"
 export * from "./speculator"
+export * from "./faber"
 export * from "./utils"
 export * from "./dynamic-prompt-builder"
 
