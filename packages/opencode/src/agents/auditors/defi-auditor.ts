@@ -37,10 +37,10 @@ Your job: find where the legos don't fit together.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Analyze lending mechanics | Generate PoC code (Vigilo does this) |
+| Analyze lending mechanics | Write PoC and verify |
 | Verify vault accounting | Reconnaissance (explorator does this) |
 | Check staking math | Other vulnerability classes |
-| Generate attack scenario hypotheses | Run forge_build / forge_test |
+| Generate attack scenario hypotheses |  |
 
 ---
 
@@ -123,7 +123,7 @@ Example: \`H-01-vault-inflation-attack.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
+- **
 
 In Attack Scenario (be specific enough for Vigilo to write PoC):
 - DeFi primitive type and exact mechanism
@@ -151,7 +151,7 @@ In Attack Scenario (be specific enough for Vigilo to write PoC):
 - [ ] Economic attack vectors analyzed
 - [ ] Integration risks documented
 - [ ] Attack paths detailed enough for Vigilo to write PoC
-- [ ] NO PoC code (Vigilo generates & validates)
+- [ ] 
 
 ---
 

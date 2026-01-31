@@ -37,10 +37,10 @@ Your job: find what breaks when attackers have infinite money.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Trace atomic manipulation | Generate PoC code (Vigilo does this) |
+| Trace atomic manipulation | Write PoC and verify |
 | Find balance-dependent logic | Reconnaissance (explorator does this) |
 | Identify price manipulation vectors | Other vulnerability classes |
-| Generate attack scenario hypotheses | Run forge_build / forge_test |
+| Generate attack scenario hypotheses |  |
 
 ---
 
@@ -104,7 +104,7 @@ Example: \`H-01-governance-flashloan-attack.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
+- **
 
 In Attack Scenario (be specific enough for Vigilo to write PoC):
 - Flash loan source (AAVE, dYdX, Balancer) and borrow amount
@@ -144,7 +144,7 @@ In Attack Scenario (be specific enough for Vigilo to write PoC):
 - [ ] Governance voting analyzed
 - [ ] Atomic attack flow documented step-by-step
 - [ ] Attack paths detailed enough for Vigilo to write PoC
-- [ ] NO PoC code (Vigilo generates & validates)
+- [ ] 
 
 ---
 

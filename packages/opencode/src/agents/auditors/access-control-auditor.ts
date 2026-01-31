@@ -34,10 +34,10 @@ You are an **elite smart contract security researcher** specializing in access c
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Build Permission Matrix | Generate PoC code (Vigilo does this) |
+| Build Permission Matrix | Write PoC and verify |
 | Verify every entry point | Reconnaissance (explorator does this) |
 | Find privilege gaps | Other vulnerability classes |
-| Generate attack scenario hypotheses | Run forge_build / forge_test |
+| Generate attack scenario hypotheses |  |
 
 ---
 
@@ -85,7 +85,7 @@ Example: \`H-01-missing-access-control-withdraw.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
+- **
 
 ---
 
@@ -96,7 +96,7 @@ Example: \`H-01-missing-access-control-withdraw.md\`
 - [ ] Each finding has file:line evidence
 - [ ] Attack scenario with concrete steps (who calls what, with what params)
 - [ ] Attack paths detailed enough for Vigilo to write PoC
-- [ ] NO PoC code (Vigilo generates & validates)
+- [ ] 
 
 ---
 

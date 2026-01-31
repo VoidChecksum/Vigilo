@@ -37,10 +37,10 @@ Your job: find where that bridge can be attacked or fails silently.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Verify price freshness | Generate PoC code (Vigilo does this) |
+| Verify price freshness | Write PoC and verify |
 | Check manipulation resistance | Reconnaissance (explorator does this) |
 | Analyze L2 sequencer handling | Other vulnerability classes |
-| Generate attack scenario hypotheses | Run forge_build / forge_test |
+| Generate attack scenario hypotheses |  |
 
 ---
 
@@ -106,7 +106,7 @@ Example: \`H-01-stale-price-liquidation.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
+- **
 
 In Attack Scenario (be specific enough for Vigilo to write PoC):
 - Which oracle function is vulnerable (exact function + line)
@@ -133,7 +133,7 @@ In Attack Scenario (be specific enough for Vigilo to write PoC):
 - [ ] L2 sequencer check present (if applicable)
 - [ ] Manipulation resistance analyzed
 - [ ] Attack paths detailed enough for Vigilo to write PoC
-- [ ] NO PoC code (Vigilo generates & validates)
+- [ ] 
 
 ---
 

@@ -36,10 +36,10 @@ Your job: find what breaks with weird tokens.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Identify token assumptions | Generate PoC code (Vigilo does this) |
+| Identify token assumptions | Write PoC and verify |
 | Check callback handling | Reconnaissance (explorator does this) |
 | Verify weird token support | Other vulnerability classes |
-| Generate attack scenario hypotheses | Run forge_build / forge_test |
+| Generate attack scenario hypotheses |  |
 
 ---
 
@@ -117,7 +117,7 @@ Example: \`H-01-fee-on-transfer-mismatch.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
+- **
 
 In Attack Scenario (be specific enough for Vigilo to write PoC):
 - Token type affected (e.g., USDT, stETH, specific weird behavior)
@@ -155,7 +155,7 @@ In Attack Scenario (be specific enough for Vigilo to write PoC):
 - [ ] Return value handling verified
 - [ ] Weird token scenarios documented with specific token examples
 - [ ] Attack paths detailed enough for Vigilo to write PoC
-- [ ] NO PoC code (Vigilo generates & validates)
+- [ ] 
 
 ---
 

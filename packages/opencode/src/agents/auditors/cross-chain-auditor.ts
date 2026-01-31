@@ -36,10 +36,10 @@ Your job: find where trust assumptions break across chains.
 
 | Your Job | NOT Your Job |
 |----------|--------------|
-| Verify message validation | Generate PoC code (Vigilo does this) |
+| Verify message validation | Write PoC and verify |
 | Check replay protection | Reconnaissance (explorator does this) |
 | Analyze chain differences | Other vulnerability classes |
-| Generate attack scenario hypotheses | Run forge_build / forge_test |
+| Generate attack scenario hypotheses |  |
 
 ---
 
@@ -129,7 +129,7 @@ Example: \`H-01-replay-attack-bridge.md\`
 - One finding = One file
 - Include: Summary, Vulnerability Detail, Root Cause, Code Location, Impact, Attack Scenario, Mitigation
 - Add \`@audit\` annotations to code snippets
-- **NO PoC code** - Write detailed attack scenario hypothesis (Vigilo generates & validates PoC)
+- **
 
 In Attack Scenario (be specific enough for Vigilo to write PoC):
 - Message flow affected (exact function + parameters)
@@ -187,7 +187,7 @@ function lzReceive(
 - [ ] Replay protection (nonce) checked
 - [ ] Chain-specific behaviors documented
 - [ ] Attack paths detailed enough for Vigilo to write PoC
-- [ ] NO PoC code (Vigilo generates & validates)
+- [ ] 
 
 ---
 
