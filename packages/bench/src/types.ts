@@ -128,3 +128,36 @@ export interface ContestEntry {
 }
 
 export type ContestRegistry = ContestEntry[];
+
+export interface ScoringMetadata {
+  detection_rate: number;
+  partial_rate: number;
+  truth_file: string;
+  truth_count: number;
+  exact_matches: number;
+  partial_matches: number;
+  scored_at: string;
+  model_used: string;
+  iterations: number;
+}
+
+export interface ScaBenchBaseline {
+  project: string;
+  timestamp: string;
+  files_analyzed: number;
+  files_skipped: number;
+  total_findings: number;
+  findings: Array<{
+    title: string;
+    description: string;
+    vulnerability_type: string;
+    severity: string;
+    confidence: number;
+    location: string;
+    file: string;
+    id: string;
+    reported_by_model: string;
+    status: string;
+  }>;
+  scoring?: ScoringMetadata;
+}
