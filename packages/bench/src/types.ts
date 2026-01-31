@@ -115,7 +115,7 @@ export interface ScoreResult {
   baseline_comparison: BaselineComparison | null;
 }
 
-export type ContestStatus = "pending" | "audited" | "scored";
+export type ContestStatus = "pending" | "audited" | "scored" | "baseline-scored";
 
 export interface ContestEntry {
   id: string;

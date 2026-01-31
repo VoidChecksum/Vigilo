@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { checkout } from "./commands/checkout.js";
 import { score } from "./commands/score.js";
+import { scoreBaseline_ } from "./commands/score-baseline.js";
 import { report } from "./commands/report.js";
 import { pipeline } from "./commands/pipeline.js";
 
@@ -29,6 +30,13 @@ program
   .option("--batch-size <n>", "Findings per batch", "10")
   .option("-v, --verbose", "Show detailed scoring process (prompts, iterations, votes)")
   .action(score);
+
+program
+  .command("score-baseline <contest-id>")
+  .description("Score baseline findings against ground truth using LLM")
+  .option("--iterations <n>", "Number of LLM iterations for majority voting", "3")
+  .option("-v, --verbose", "Show detailed scoring process")
+  .action(scoreBaseline_);
 
 program
   .command("report")
