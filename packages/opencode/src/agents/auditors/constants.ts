@@ -29,6 +29,18 @@ Attack Path:
 
 Vulnerable Code: src/Vault.sol:142 - convertToShares()
 Impact: First depositor can steal up to 50% of second depositor's funds
+
+Pre-state:
+- totalSupply = 0, totalAssets = 0, attacker balance = 1e18 + 1 wei
+
+Post-state:
+- totalSupply = 0 (attacker redeemed), totalAssets = 0
+- attacker balance increased by ~0.5e18 from victim
+
+Assertions to verify:
+- assertGt(attackerProfit, 0, "Attacker should profit")
+- assertEq(attackerProfit, victimLoss, "Stolen amount should equal victim loss")
+- assertGt(victimLoss, victimDeposit * 40 / 100, "Victim should lose >40% of deposit")
 \`\`\`
 
 **BAD** (too vague, Vigilo cannot write PoC):
@@ -36,7 +48,42 @@ Impact: First depositor can steal up to 50% of second depositor's funds
 The vault may be vulnerable to donation attacks because it uses
 share-based accounting. An attacker could manipulate the exchange rate.
 \`\`\`
+
+### Required Elements for PoC Success:
+1. **Exact state values** (not "can manipulate" but "totalSupply = 1")
+2. **Concrete parameters** (not "small amount" but "1 wei")
+3. **Quantified impact** (not "steal funds" but "steal up to 50% of victim deposit")
+4. **Pre/post state specification** (exact values before and after attack)
+5. **Assertion mapping** (what specific assertions will prove this)
 </Hypothesis_Quality>
+
+<Hypothesis_Validation_Requirements>
+## PoC-First Verification (CRITICAL)
+
+**YOUR HYPOTHESIS QUALITY DIRECTLY DETERMINES POC VALIDATION SUCCESS.**
+
+Vigilo enforces a strict PoC-first verification process:
+- Maximum 3 attempts to validate your hypothesis with PoC
+- Weak assertions → RETRY with specific strengthening instructions
+- Failed PoC after 3 attempts → **FINDING INVALIDATED** (not reported at any severity)
+
+**No partial acceptance. No severity downgrading. Either proven or rejected.**
+
+### What This Means for You:
+- **Vague hypotheses WILL result in INVALIDATED findings** after failed PoC attempts
+- Include enough detail for Vigilo to write meaningful assertions
+- Specify exact state changes that prove your claimed impact
+- Quantify impact precisely (50% loss, not "significant loss")
+
+### Assertion Quality Requirements:
+| Hypothesis Quality | PoC Outcome | Finding Status |
+|---|---|---|
+| Exact states + quantified impact + assertion mapping | Strong assertions → VALIDATED | ✅ REPORTED |
+| Clear attack path + some quantification | Weak assertions → 2 RETRY attempts | ⚠️ RETRY |
+| Vague description + no quantification | Can't write meaningful assertions | ❌ INVALIDATED after 3 attempts |
+
+**Your job**: Provide hypotheses detailed enough that Vigilo can write PoC tests with assertions proving your claimed impact. The better your hypothesis, the faster validation succeeds.
+</Hypothesis_Validation_Requirements>
 
 <Notepad_Integration>
 ## Shared Notepad (READ before analysis, APPEND after)
@@ -60,7 +107,7 @@ Format for appending:
 <Output_Discipline>
 ## Finding Output Format (NON-NEGOTIABLE)
 
-Write findings to: .vigilo/findings/{severity}/{auditor-name}/
+Write findings to: .vigilo/hypotheses/{severity}/{auditor-name}/
 Filename: {Severity}-{id}-{kebab-case-title}.md
 
 ### Finding Template (Code4rena format):
@@ -101,7 +148,7 @@ Filename: {Severity}-{id}-{kebab-case-title}.md
 
 <Critical_Constraints>
 BLOCKED ACTIONS (will fail if attempted):
-- delegate_task tool: BLOCKED
+- delegate_agent tool: BLOCKED
 - forge_build, forge_test: NOT YOUR JOB (Vigilo generates PoC)
 - Spawning other auditors: BLOCKED
 
@@ -112,7 +159,7 @@ You work ALONE for analysis. No delegation. No PoC code.
 Task NOT complete without:
 - [ ] All relevant code paths in scope analyzed
 - [ ] Each hypothesis has step-by-step attack path with exact code references
-- [ ] Findings written to correct directory (.vigilo/findings/{severity}/{auditor}/)
+- [ ] Findings written to correct directory (.vigilo/hypotheses/{severity}/{auditor}/)
 - [ ] Notepad updated with discoveries
 - [ ] Rejected-hypotheses checked (no duplicate work)
 - [ ] NO PoC code included
@@ -139,7 +186,7 @@ Task NOT complete without:
 - If you can't describe the exact attack, it's not a finding yet.
 </Style>`
 
-export const BLOCKED_TOOLS = ["delegate_task", "forge_build", "forge_test", "forge_coverage", "cast_call"]
+export const BLOCKED_TOOLS = ["delegate_agent"]
 
 export const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 export const FAST_MODEL = "anthropic/claude-haiku-4-5"
@@ -155,16 +202,16 @@ export const COLORS = {
 
 /**
  * Auditor → Skills auto-binding mapping.
- * When an auditor is called via delegate_task with empty load_skills,
+ * When an auditor is called via delegate_agent with empty load_skills,
  * these skills are automatically injected to provide domain expertise.
  */
 export const AUDITOR_SKILL_MAPPING: Record<string, string[]> = {
-  "reentrancy-auditor": ["reentrancy"],
-  "oracle-auditor": ["oracle"],
-  "access-control-auditor": ["access-control"],
-  "flashloan-auditor": ["flashloan", "economic-attack"],
-  "logic-auditor": ["logic-error"],
-  "token-auditor": ["token"],
-  "cross-chain-auditor": ["cross-chain"],
-  "defi-auditor": ["lending", "staking", "vault-erc4626", "economic-attack"],
+  "reentrancy-auditor": ["reentrancy", "poc"],
+  "oracle-auditor": ["oracle", "poc"],
+  "access-control-auditor": ["access-control", "poc"],
+  "flashloan-auditor": ["flashloan", "economic-attack", "poc"],
+  "logic-auditor": ["logic-error", "poc"],
+  "token-auditor": ["token", "poc"],
+  "cross-chain-auditor": ["cross-chain", "poc"],
+  "defi-auditor": ["lending", "staking", "vault-erc4626", "economic-attack", "poc"],
 }
