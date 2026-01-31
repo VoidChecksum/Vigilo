@@ -5,7 +5,7 @@ import { buildPrompt } from "./prompts.js";
 import { initOpenCodeClient, closeOpenCodeClient, sendPrompt, type LLMResponse } from "../client/opencode.js";
 import pc from "picocolors";
 
-interface WorkingFinding extends VigiloFinding {
+export interface WorkingFinding extends VigiloFinding {
   originalIndex: number;
 }
 
@@ -116,7 +116,7 @@ async function runIterations(
   return responses;
 }
 
-async function matchTruthFinding(
+export async function matchTruthFinding(
   truth: ScaBenchVulnerability,
   workingSet: WorkingFinding[],
   config: ScorerConfig
