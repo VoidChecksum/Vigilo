@@ -15,7 +15,7 @@ import { AUDIT_CATEGORIES, AUDIT_CATEGORY_PROMPT_APPENDS, AUDIT_CATEGORY_DESCRIP
 
 type OpencodeClient = PluginInput["client"]
 
-// Default agent for category-based tasks (similar to OMO's sisyphus-junior)
+// Default agent for category-based tasks (category executor)
 const CATEGORY_EXECUTOR_AGENT = "category-executor"
 
 function parseModelString(model: string): { providerID: string; modelID: string } | undefined {
