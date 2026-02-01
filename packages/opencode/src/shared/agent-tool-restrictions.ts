@@ -11,29 +11,13 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   edit: false,
   task: false,
   delegate_task: false,
-  call_omo_agent: false,
+  call_vigilo_agent: false,
 }
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
-  explore: EXPLORATION_AGENT_DENYLIST,
+  explorator: EXPLORATION_AGENT_DENYLIST,
 
-  librarian: EXPLORATION_AGENT_DENYLIST,
-
-  oracle: {
-    write: false,
-    edit: false,
-    task: false,
-    delegate_task: false,
-  },
-
-  "multimodal-looker": {
-    read: true,
-  },
-
-  "sisyphus-junior": {
-    task: false,
-    delegate_task: false,
-  },
+  speculator: EXPLORATION_AGENT_DENYLIST,
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
