@@ -1,6 +1,6 @@
 {
   "name": "vigilo",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Vigilo - Web3 Smart Contract Security Auditing Orchestrator for OpenCode",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,9 +11,6 @@
   "files": [
     "dist",
     "bin",
-    "skills",
-    "agents",
-    "commands",
     "postinstall.mjs"
   ],
   "exports": {
@@ -79,13 +76,13 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "vigilo-darwin-arm64": "1.0.2",
-    "vigilo-darwin-x64": "1.0.2",
-    "vigilo-linux-arm64": "1.0.2",
-    "vigilo-linux-arm64-musl": "1.0.2",
-    "vigilo-linux-x64": "1.0.2",
-    "vigilo-linux-x64-musl": "1.0.2",
-    "vigilo-windows-x64": "1.0.2"
+    "vigilo-darwin-arm64": "1.0.3",
+    "vigilo-darwin-x64": "1.0.3",
+    "vigilo-linux-arm64": "1.0.3",
+    "vigilo-linux-arm64-musl": "1.0.3",
+    "vigilo-linux-x64": "1.0.3",
+    "vigilo-linux-x64-musl": "1.0.3",
+    "vigilo-windows-x64": "1.0.3"
   },
   "repository": {
     "type": "git",

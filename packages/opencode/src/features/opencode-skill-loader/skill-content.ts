@@ -1,4 +1,4 @@
-import { initBuiltinSkills, getBuiltinSkills } from "../builtin-skills/skills"
+import { getBuiltinSkills } from "../builtin-skills/skills"
 import { discoverSkills } from "./loader"
 import type { LoadedSkill } from "./types"
 import { parseFrontmatter } from "../../shared/frontmatter"
@@ -20,10 +20,11 @@ function clearSkillCache(): void {
 async function getAllSkills(): Promise<LoadedSkill[]> {
 	if (cachedSkills) return cachedSkills
 
-	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
+	const [discoveredSkills] = await Promise.all([
 		discoverSkills({ includeClaudeCodePaths: true }),
-		initBuiltinSkills(),
 	])
+	
+	const builtinSkillDefs = getBuiltinSkills()
 
 	const builtinSkillsAsLoaded: LoadedSkill[] = builtinSkillDefs.map((skill) => ({
 		name: skill.name,

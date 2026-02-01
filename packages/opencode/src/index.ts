@@ -44,7 +44,7 @@ import {
   discoverOpencodeProjectSkills,
   mergeSkills,
 } from "./features/opencode-skill-loader"
-import { initBuiltinSkills, getBuiltinSkills } from "./features/builtin-skills"
+import { getBuiltinSkills } from "./features/builtin-skills"
 import { loadVigiloConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createConfigHandler } from "./plugin-handlers"
@@ -112,7 +112,6 @@ const VigiloPlugin: Plugin = async (ctx) => {
 
   const callVigiloAgent = createCallVigiloAgent(ctx, backgroundManager)
 
-  await initBuiltinSkills()
   const builtinSkills = getBuiltinSkills()
   
   const [globalSkills, projectSkills] = await Promise.all([
