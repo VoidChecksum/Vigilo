@@ -24,9 +24,128 @@ This skill provides comprehensive knowledge for auditing DeFi lending protocols.
 
 ---
 
+## Why Lending Protocol Attacks Happen (Root Causes)
+
+### Root Cause 1: Health Factor Calculation Timing
+
+The fundamental vulnerability: health factors computed from stale or cached data instead of real-time prices.
+
+```solidity
+// VULNERABLE: Cached health factor
+mapping(address => uint256) public healthFactors;
+
+function liquidate(address user) external {
+    // Uses stale cached value
+    require(healthFactors[user] < 1e18);
+    // Actual health factor may be different!
+}
+
+// SECURE: Compute in real-time
+function liquidate(address user) external {
+    uint256 collateralValue = getCollateralValue(user);  // Real-time oracle
+    uint256 debtValue = getDebtValue(user);
+    uint256 healthFactor = collateralValue * 1e18 / debtValue;
+    require(healthFactor < 1e18);
+}
+```
+
+**Attacker's view**: "The protocol checks a stale health factor. I can manipulate prices between the check and liquidation, or liquidate users who are actually safe."
+
+### Root Cause 2: Liquidation Incentive Misconfiguration
+
+Liquidation bonus set higher than the safety margin, making self-liquidation profitable.
+
+```solidity
+// VULNERABLE: Bonus exceeds safety margin
+uint256 constant MAX_LTV = 80e16;           // 80%
+uint256 constant LIQUIDATION_BONUS = 15e16; // 15%
+
+// Attacker borrows at 80% LTV, self-liquidates with 15% bonus
+// Net profit: 15% - (100% - 80%) = -5%... wait, this is a loss
+// But if bonus > (100% - LTV), it's profitable!
+
+uint256 constant LIQUIDATION_BONUS = 25e16; // 25% (DANGEROUS!)
+// Profit: 25% - 20% = 5% free money
+```
+
+**Attacker's view**: "I borrow at max LTV, wait for any price movement, then self-liquidate and pocket the bonus."
+
+### Root Cause 3: Interest Precision Loss
+
+Small amounts round to zero during interest accrual, allowing dust attacks or precision exploits.
+
+```solidity
+// VULNERABLE: Interest rounds to 0
+uint256 interest = principal * rate / SECONDS_PER_YEAR;
+// If principal * rate < SECONDS_PER_YEAR, interest = 0
+
+// Example: principal = 100 wei, rate = 1e16 (1%)
+// interest = 100 * 1e16 / 31536000 = 0 (rounds down)
+
+// SECURE: Use high-precision accumulator
+uint256 interestAccumulator; // Ray (1e27) precision
+uint256 newAccumulator = oldAccumulator + (rate * 1e27 / SECONDS_PER_YEAR);
+```
+
+**Attacker's view**: "I can deposit tiny amounts that accrue zero interest, or exploit rounding to avoid paying interest on small borrows."
+
+### Root Cause 4: Collateral Valuation Trust
+
+Collateral value depends entirely on oracle accuracy. Stale, manipulated, or incorrect oracles break the entire protocol.
+
+```solidity
+// VULNERABLE: Single oracle, no staleness check
+function getCollateralValue(address user) public view returns (uint256) {
+    uint256 price = oracle.getPrice(collateralToken);  // Could be stale!
+    return userBalance * price / 1e18;
+}
+
+// SECURE: Validate oracle freshness
+function getCollateralValue(address user) public view returns (uint256) {
+    (uint256 price, uint256 timestamp) = oracle.getPriceWithTimestamp(collateralToken);
+    require(block.timestamp - timestamp <= MAX_STALENESS);
+    return userBalance * price / 1e18;
+}
+```
+
+**Attacker's view**: "If I can manipulate the oracle or use a stale price, I can inflate collateral value and borrow more than safe."
+
+### Root Cause 5: Bad Debt Socialization Gap
+
+When liquidation fails to recover full debt, bad debt accumulates and is socialized across remaining suppliers, creating insolvency.
+
+```solidity
+// VULNERABLE: No bad debt handling
+function liquidate(address user) external {
+    uint256 collateralValue = getCollateralValue(user);
+    uint256 debtValue = getDebtValue(user);
+    
+    // If collateral < debt, bad debt remains!
+    // Suppliers lose money
+}
+
+// SECURE: Handle underwater positions
+function liquidate(address user) external {
+    uint256 collateralValue = getCollateralValue(user);
+    uint256 debtValue = getDebtValue(user);
+    
+    if (collateralValue < debtValue) {
+        uint256 badDebt = debtValue - collateralValue;
+        // Socialize or use insurance fund
+        insuranceFund -= min(badDebt, insuranceFund);
+    }
+}
+```
+
+**Attacker's view**: "If I can create a position where collateral < debt, the protocol becomes insolvent and I profit from the socialized loss."
+
+---
+
 ## Liquidation Vulnerabilities
 
 ### 1. Profitable Self-Liquidation
+
+**Root Cause**: Root Cause 2 (Liquidation Incentive Misconfiguration)
 
 **Vulnerable Pattern:**
 ```solidity
@@ -57,6 +176,8 @@ function liquidate(address user, uint256 repayAmount) external {
 ```
 
 ### 3. Bad Debt Accumulation
+
+**Root Cause**: Root Cause 5 (Bad Debt Socialization Gap)
 
 **Vulnerable Pattern:**
 ```solidity
@@ -121,6 +242,9 @@ contract JumpRateModel {
 ```
 
 **2. Precision Loss**
+
+**Root Cause**: Root Cause 3 (Interest Precision Loss)
+
 ```solidity
 // DANGEROUS: Interest rounds to 0 for small amounts
 uint256 interest = principal * rate / SECONDS_PER_YEAR;
@@ -152,6 +276,8 @@ function setCollateralFactor(address token, uint256 newFactor) external {
 ```
 
 ### 2. Collateral Oracle Manipulation
+
+**Root Cause**: Root Cause 4 (Collateral Valuation Trust)
 
 ```solidity
 // Collateral valued using manipulable oracle
@@ -215,6 +341,9 @@ Health Factor < 1: Liquidatable
 ### Vulnerabilities
 
 **1. Stale Health Factor**
+
+**Root Cause**: Root Cause 1 (Health Factor Calculation Timing)
+
 ```solidity
 // DANGEROUS: Cached health factor
 mapping(address => uint256) public healthFactors;
@@ -303,3 +432,15 @@ uint256 newIndex = oldIndex + (interest * 1e18 / totalSupply);
 - Missing borrow caps
 - Liquidation can be blocked
 - Rate model edge cases
+
+---
+
+## Rationalization Table
+
+| Root Cause | Historical Exploit | Detection Method | Severity | Mitigation |
+|-----------|-------------------|------------------|----------|-----------|
+| Health Factor Calculation Timing | Stale price liquidations (Aave v1 oracle failures) | Check if health factor computed real-time from oracle | Critical | Always compute health factor in real-time, validate oracle freshness |
+| Liquidation Incentive Misconfiguration | Self-liquidation profit (Compound liquidation bonus > safety margin) | Verify: bonus < (100% - max LTV) | Critical | Set liquidation bonus ≤ (100% - max LTV), audit parameter changes |
+| Interest Precision Loss | Dust attack exploits (small amounts accrue zero interest) | Check interest calculation for rounding to zero | High | Use high-precision accumulators (ray/wad), test with small amounts |
+| Collateral Valuation Trust | Oracle manipulation attacks (Euler oracle dependency) | Audit oracle source, check staleness, validate multi-source | Critical | Use manipulation-resistant oracles, implement staleness checks, multi-oracle fallback |
+| Bad Debt Socialization Gap | Protocol insolvency (Euler bad debt cascade) | Check if collateral < debt is handled | Critical | Implement bad debt handling, insurance fund, or liquidation guarantees |
