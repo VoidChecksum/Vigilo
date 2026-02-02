@@ -452,10 +452,10 @@ export const COLORS = {
 export const AUDITOR_SKILL_MAPPING: Record<string, string[]> = {
   "reentrancy-auditor": ["reentrancy", "poc"],
   "oracle-auditor": ["oracle", "poc"],
-  "access-control-auditor": ["access-control", "poc"],
+  "access-control-auditor": ["access-control", "upgradeability", "poc"],
   "flashloan-auditor": ["flashloan", "economic-attack", "poc"],
-  "logic-auditor": ["logic-error", "poc"],
+  "logic-auditor": ["logic-error", "input-validation", "dos-attack", "randomness", "poc"],
   "token-auditor": ["token", "poc"],
   "cross-chain-auditor": ["cross-chain", "poc"],
-  "defi-auditor": ["lending", "staking", "vault-erc4626", "economic-attack", "poc"],
+  "defi-auditor": ["lending", "staking", "vault-erc4626", "economic-attack", "restaking", "poc"],
 }

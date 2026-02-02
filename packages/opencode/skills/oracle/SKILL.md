@@ -206,7 +206,120 @@ Different price feeds have different update frequencies:
 - Oracle revert not handled
 - Single oracle dependency
 
+---
+
+### 8. Pyth Network Vulnerabilities
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Not checking confidence interval
+PythStructs.Price memory price = pyth.getPriceUnsafe(priceId);
+return uint256(price.price);  // @audit No confidence or timestamp check!
+```
+
+**Secure Pattern:**
+```solidity
+PythStructs.Price memory price = pyth.getPriceNoOlderThan(priceId, MAX_AGE);
+require(price.price > 0, "Invalid price");
+// Check confidence interval (price.conf should be small relative to price)
+require(price.conf * 100 / uint64(price.price) < MAX_CONFIDENCE_PERCENT, "Price uncertain");
+```
+
+**Search Queries:**
+```
+Grep("pyth|Pyth|PythStructs|getPriceUnsafe", glob="**/*.sol")
+```
+
+---
+
+### 9. Redstone / API3 Patterns
+
+**Redstone:**
+```solidity
+// Redstone uses signature-based price feeds
+// VULNERABLE: Not validating timestamp
+function getPrice(bytes calldata redstoneData) external view returns (uint256) {
+    // Redstone data includes signatures - verify freshness
+}
+```
+
+**API3:**
+```solidity
+// VULNERABLE: No timestamp check
+(int224 value,) = api3Reader.read(dataFeedId);
+
+// SECURE: Check timestamp
+(int224 value, uint32 timestamp) = api3ReaderProxy.read();
+require(block.timestamp - timestamp < MAX_AGE, "Stale");
+```
+
+**Search Queries:**
+```
+Grep("redstone|Redstone|api3|API3|dataFeedId", glob="**/*.sol")
+```
+
+---
+
+### 10. New L2 Oracle Considerations (2025-2026)
+
+| L2 Chain | Sequencer Feed | Special Considerations |
+|----------|----------------|------------------------|
+| Arbitrum | Yes (required) | L1 block numbers via `ArbSys` |
+| Optimism | Yes (required) | Uses L1 blockhash for randomness |
+| Base | Yes (required) | Same as Optimism |
+| Blast | Yes (required) | Native yield may affect pricing |
+| Linea | Yes (recommended) | zkEVM specific timing |
+| zkSync Era | No feed yet | Sequencer centralized |
+| Scroll | No feed yet | zkEVM, check centralization |
+
+**Base/Optimism Sequencer Check:**
+```solidity
+address constant SEQUENCER_FEED = 0xBCF85224fc0756B9Fa45aA7892530B47e10b6433;
+
+function checkSequencer() internal view {
+    (, int256 answer, uint256 startedAt,,) = 
+        AggregatorV3Interface(SEQUENCER_FEED).latestRoundData();
+    
+    require(answer == 0, "Sequencer down");
+    require(block.timestamp - startedAt > GRACE_PERIOD, "Grace period");
+}
+```
+
+---
+
+### 11. Multi-Oracle / Fallback Patterns
+
+**Secure Multi-Oracle:**
+```solidity
+function getPrice() public view returns (uint256) {
+    // Try primary oracle
+    (uint256 price1, bool valid1) = _getChainlinkPrice();
+    (uint256 price2, bool valid2) = _getPythPrice();
+    
+    if (valid1 && valid2) {
+        // Both valid - check deviation
+        uint256 deviation = _calculateDeviation(price1, price2);
+        require(deviation < MAX_DEVIATION, "Oracle deviation");
+        return (price1 + price2) / 2;
+    }
+    
+    if (valid1) return price1;
+    if (valid2) return price2;
+    
+    revert("No valid oracle");
+}
+```
+
+**Search Queries:**
+```
+Grep("fallback.*oracle|backup.*price|secondary.*feed", glob="**/*.sol")
+```
+
+---
+
 ## References
 
 For detailed Chainlink integration patterns, see:
-- `integration-patterns/chainlink/SKILL.md`
+- Chainlink Docs: https://docs.chain.link
+- Pyth Network: https://docs.pyth.network
+- API3: https://docs.api3.org

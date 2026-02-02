@@ -10,7 +10,7 @@ user-invocable: false
 
 # Reentrancy Vulnerability Analysis
 
-**2025 Statistics**: Reentrancy caused **$350M+** historical losses, OWASP 2025 ranks it **#5**, 2024 attacks include Penpie, Clober, GemPad.
+**OWASP SC05:2025** - Reentrancy ranks **#5** in OWASP Smart Contract Top 10 (2025). Historical losses exceed **$500M+**, with 2024-2025 attacks including Penpie ($27M), Clober, GemPad, and multiple ERC721/1155 callback exploits.
 
 ---
 

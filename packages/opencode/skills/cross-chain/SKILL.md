@@ -297,3 +297,225 @@ function lzReceive(
 - Chain-specific code assumptions
 - Incomplete trusted remote setup
 - Missing event emission
+
+---
+
+## Modern Bridge Protocols (2025-2026)
+
+### Chainlink CCIP
+
+**Key Security Checks:**
+```solidity
+import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
+
+contract MyCCIPReceiver is CCIPReceiver {
+    mapping(uint64 => bool) public allowedSourceChains;
+    mapping(address => bool) public allowedSenders;
+    
+    function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
+        // 1. Chain validation
+        require(allowedSourceChains[message.sourceChainSelector], "Invalid chain");
+        
+        // 2. Sender validation
+        address sender = abi.decode(message.sender, (address));
+        require(allowedSenders[sender], "Invalid sender");
+        
+        // 3. Process message
+        _processMessage(message.data);
+    }
+}
+```
+
+**CCIP-Specific Risks:**
+- `sourceChainSelector` not validated
+- `message.sender` not decoded/validated
+- Rate limits not enforced
+- Token transfer vs message confusion
+
+**Search Queries:**
+```
+Grep("CCIP|ccip|CCIPReceiver|sourceChainSelector", glob="**/*.sol")
+```
+
+---
+
+### Hyperlane
+
+**Key Security Checks:**
+```solidity
+import {IMessageRecipient} from "@hyperlane-xyz/core/contracts/interfaces/IMessageRecipient.sol";
+
+contract MyHyperlaneReceiver is IMessageRecipient {
+    address public mailbox;
+    mapping(uint32 => bytes32) public trustedSenders;
+    
+    function handle(
+        uint32 _origin,
+        bytes32 _sender,
+        bytes calldata _message
+    ) external payable override {
+        // 1. Mailbox validation
+        require(msg.sender == mailbox, "Invalid mailbox");
+        
+        // 2. Origin chain validation
+        require(trustedSenders[_origin] != bytes32(0), "Unknown origin");
+        
+        // 3. Sender validation
+        require(_sender == trustedSenders[_origin], "Invalid sender");
+        
+        // 4. Process
+        _processMessage(_message);
+    }
+}
+```
+
+**Hyperlane-Specific Risks:**
+- Mailbox address not validated
+- `_sender` is bytes32 (address left-padded)
+- Interchain Security Module (ISM) misconfiguration
+- Missing origin validation
+
+**Search Queries:**
+```
+Grep("Hyperlane|hyperlane|IMessageRecipient|mailbox", glob="**/*.sol")
+```
+
+---
+
+### Wormhole
+
+**Key Security Checks:**
+```solidity
+import {IWormhole} from "./interfaces/IWormhole.sol";
+
+contract MyWormholeReceiver {
+    IWormhole public wormhole;
+    mapping(uint16 => bytes32) public registeredEmitters;
+    mapping(bytes32 => bool) public processedMessages;
+    
+    function receiveMessage(bytes memory encodedVM) external {
+        // 1. Parse and verify VAA
+        (IWormhole.VM memory vm, bool valid, string memory reason) = 
+            wormhole.parseAndVerifyVM(encodedVM);
+        require(valid, reason);
+        
+        // 2. Replay protection
+        require(!processedMessages[vm.hash], "Already processed");
+        processedMessages[vm.hash] = true;
+        
+        // 3. Emitter validation
+        require(
+            registeredEmitters[vm.emitterChainId] == vm.emitterAddress,
+            "Invalid emitter"
+        );
+        
+        // 4. Process payload
+        _processPayload(vm.payload);
+    }
+}
+```
+
+**Wormhole-Specific Risks:**
+- VAA not verified via `parseAndVerifyVM`
+- Emitter chain/address not validated (Wormhole hack root cause)
+- VAA hash not tracked for replay
+- Guardian set changes
+
+**Search Queries:**
+```
+Grep("Wormhole|wormhole|parseAndVerifyVM|emitterChainId", glob="**/*.sol")
+```
+
+---
+
+### LayerZero v2
+
+**Key Changes from v1:**
+```solidity
+// v2 uses OApp pattern
+import { OApp } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
+
+contract MyOApp is OApp {
+    constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) {}
+    
+    function _lzReceive(
+        Origin calldata _origin,  // New struct format
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) internal override {
+        // Origin contains srcEid (endpoint ID), sender, nonce
+        require(_origin.srcEid == trustedEndpointId, "Invalid source");
+        require(_origin.sender == trustedSender, "Invalid sender");
+        
+        _processMessage(_message);
+    }
+}
+```
+
+**v2-Specific Considerations:**
+- New `Origin` struct format
+- `_guid` for message tracking
+- Executor and extraData parameters
+- DVN (Decentralized Verifier Network) configuration
+
+**Search Queries:**
+```
+Grep("OApp|lz-evm-oapp|srcEid|_lzReceive", glob="**/*.sol")
+```
+
+---
+
+### L2-to-L2 Messaging (2025-2026 Trend)
+
+With L2 proliferation, direct L2-to-L2 messaging is emerging:
+
+**Patterns:**
+- Arbitrum Orbit ↔ Arbitrum Orbit
+- OP Stack ↔ OP Stack (Superchain)
+- zkSync Hyperchains
+
+**Risks:**
+- Sequencer trust assumptions differ per L2
+- Finality varies significantly
+- Shared security models may have gaps
+
+**Search Queries:**
+```
+Grep("L2ToL2|superchain|hyperchain|orbit", glob="**/*.sol")
+```
+
+---
+
+## Updated Cross-Chain Audit Checklist
+
+### Protocol-Specific
+- [ ] **LayerZero**: Trusted remote properly configured
+- [ ] **CCIP**: sourceChainSelector validated
+- [ ] **Hyperlane**: Mailbox and ISM configured
+- [ ] **Wormhole**: parseAndVerifyVM used, emitter validated
+
+### Universal
+- [ ] Source chain validated
+- [ ] Source address validated
+- [ ] Message ID/hash tracked (replay protection)
+- [ ] Finality assumptions match chain
+- [ ] Failed message recovery exists
+- [ ] Rate limiting implemented
+
+---
+
+## Search Query Reference
+
+```
+# Find bridge integrations
+Grep("LayerZero|lzReceive|lzEndpoint|OApp", glob="**/*.sol")
+Grep("CCIP|ccipReceive|CCIPReceiver", glob="**/*.sol")
+Grep("Hyperlane|IMessageRecipient|mailbox", glob="**/*.sol")
+Grep("Wormhole|parseAndVerifyVM|emitterChainId", glob="**/*.sol")
+
+# Find cross-chain patterns
+Grep("srcChainId|sourceChain|originChain|_origin", glob="**/*.sol")
+Grep("trustedRemote|registeredEmitter|allowedSender", glob="**/*.sol")
+```

@@ -10,7 +10,7 @@ user-invocable: false
 
 # Economic Attack Vulnerability Analysis
 
-**2025 Statistics**: Flash loans = **83.3% of DeFi exploits**, Oracle manipulation = **+31% YoY**, Price manipulation = **34.3% of MUBs**.
+**OWASP SC02/SC07:2025** - Oracle Manipulation (#2) and Flash Loan Attacks (#7) in OWASP SC Top 10 (2025). Flash loans enable **60%+ of DeFi exploits**, with 2024-2025 major attacks including Cetus ($223M), Euler ($197M), KiloEx ($117M). Price manipulation accounts for **34%+ of market manipulation exploits**.
 
 ---
 

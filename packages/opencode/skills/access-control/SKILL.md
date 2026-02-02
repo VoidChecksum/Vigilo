@@ -10,7 +10,7 @@ user-invocable: false
 
 # Access Control Vulnerability Analysis
 
-**2025 Statistics**: Access Control is **#1 vulnerability class** with **$953.2M in losses**.
+**OWASP SC01:2025** - Access Control is **#1 vulnerability class** in OWASP Smart Contract Top 10 (2025), with **$1.2B+ in cumulative losses** through 2025, including the Bybit hack ($1.4B) and multiple privilege escalation exploits.
 
 ---
 

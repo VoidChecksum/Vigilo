@@ -286,3 +286,182 @@ token.increaseAllowance(spender, amount);
 - Blacklist DoS potential
 - Approval race condition
 - No zero-amount validation
+
+---
+
+## Additional Token Patterns (2025-2026)
+
+### 9. ERC-2612 Permit Vulnerabilities
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: No deadline validation
+function depositWithPermit(
+    uint256 amount,
+    uint8 v, bytes32 r, bytes32 s
+) external {
+    token.permit(msg.sender, address(this), amount, type(uint256).max, v, r, s);
+    // @audit deadline = max allows signature to be used forever
+    token.transferFrom(msg.sender, address(this), amount);
+}
+```
+
+**Secure Pattern:**
+```solidity
+function depositWithPermit(
+    uint256 amount,
+    uint256 deadline,
+    uint8 v, bytes32 r, bytes32 s
+) external {
+    require(deadline >= block.timestamp, "Expired");
+    token.permit(msg.sender, address(this), amount, deadline, v, r, s);
+    token.transferFrom(msg.sender, address(this), amount);
+}
+```
+
+**Signature Replay Risks:**
+- Same signature valid on multiple chains (missing chainId)
+- Permit can be front-run if deadline is far future
+- DoS by calling permit with invalid signature (some implementations)
+
+**Search Queries:**
+```
+Grep("permit|Permit|PERMIT_TYPEHASH|nonces", glob="**/*.sol")
+Grep("ecrecover|ECDSA|v.*r.*s", glob="**/*.sol")
+```
+
+---
+
+### 10. Permit2 Vulnerabilities (Uniswap)
+
+**Overview**: Permit2 is a universal approval system that introduces new attack vectors.
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: No expiration check on permit2
+function swapWithPermit2(
+    ISignatureTransfer.PermitTransferFrom calldata permit,
+    ISignatureTransfer.SignatureTransferDetails calldata transferDetails,
+    bytes calldata signature
+) external {
+    permit2.permitTransferFrom(permit, transferDetails, msg.sender, signature);
+    // @audit What if permit.deadline is far in future?
+}
+```
+
+**Permit2 Specific Risks:**
+1. **Batch Permits**: Single signature approves multiple tokens
+2. **Witness Data**: Additional data can be signed but misinterpreted
+3. **Signature Malleability**: Different signatures for same approval
+4. **Nonce Invalidation**: Can invalidate others' permits
+
+**Search Queries:**
+```
+Grep("Permit2|permit2|ISignatureTransfer|IAllowanceTransfer", glob="**/*.sol")
+Grep("permitTransferFrom|permitWitnessTransferFrom", glob="**/*.sol")
+```
+
+**Security Checklist:**
+- [ ] Deadline always validated
+- [ ] Nonce management understood
+- [ ] Witness data properly validated
+- [ ] Signature cannot be reused maliciously
+
+---
+
+### 11. ERC-4626 Token Integration Risks
+
+When integrating ERC-4626 vaults as collateral or tokens:
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Trusting vault's reported value
+function getCollateralValue(address user) external view returns (uint256) {
+    uint256 shares = vault.balanceOf(user);
+    return vault.convertToAssets(shares);  // @audit Can be manipulated via donation!
+}
+```
+
+**Attack Vector:**
+1. Attacker donates to vault, inflating `totalAssets`
+2. `convertToAssets()` returns inflated value
+3. Protocol accepts as collateral at wrong price
+4. Attacker borrows against inflated collateral
+
+**Secure Pattern:**
+```solidity
+// Use time-weighted or oracle-based pricing for ERC-4626 tokens
+function getCollateralValue(address user) external view returns (uint256) {
+    uint256 shares = vault.balanceOf(user);
+    // Use external oracle for share price, NOT vault.convertToAssets()
+    uint256 sharePrice = oracle.getPrice(address(vault));
+    return shares * sharePrice / 1e18;
+}
+```
+
+**Search Queries:**
+```
+Grep("ERC4626|convertToAssets|convertToShares|previewDeposit", glob="**/*.sol")
+Grep("vault.*balanceOf|collateral.*vault", glob="**/*.sol")
+```
+
+---
+
+### 12. ERC-1363 (transferAndCall) Reentrancy
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: ERC-1363 triggers callback on receive
+function receiveApproval(
+    address from,
+    uint256 amount,
+    address token,
+    bytes calldata data
+) external {
+    // @audit This is called during transferAndCall/approveAndCall
+    // State may not be updated yet!
+}
+```
+
+**Search Queries:**
+```
+Grep("ERC1363|transferAndCall|approveAndCall|onApprovalReceived", glob="**/*.sol")
+```
+
+---
+
+## Updated Token Compatibility Matrix (2025-2026)
+
+| Token | Fee | Rebase | Blacklist | Callback | Permit | Notes |
+|-------|-----|--------|-----------|----------|--------|-------|
+| USDT | No* | No | Yes | No | No | Missing return |
+| USDC | No | No | Yes | No | Yes | v2 has permit |
+| DAI | No | No | No | No | Yes | Original permit |
+| stETH | No | Yes | No | No | Yes | Rebases daily |
+| wstETH | No | No | No | No | Yes | Wrapped stETH |
+| WBTC | No | No | No | No | No | 8 decimals |
+| PAXG | Yes | No | No | No | No | 0.02% fee |
+| ERC777 | No | No | No | Yes | No | Deprecated |
+| LRTs | Varies | No | No | No | Yes | Check implementation |
+
+*USDT has fee mechanism but set to 0
+
+---
+
+## Search Query Reference
+
+```
+# Find permit patterns
+Grep("permit|Permit|DOMAIN_SEPARATOR|PERMIT_TYPEHASH", glob="**/*.sol")
+Grep("permit2|Permit2|ISignatureTransfer", glob="**/*.sol")
+
+# Find callback tokens
+Grep("ERC777|ERC1363|tokensReceived|onTransferReceived", glob="**/*.sol")
+Grep("safeTransfer|safeMint|onERC721Received", glob="**/*.sol")
+
+# Find vault integrations
+Grep("ERC4626|convertToAssets|convertToShares", glob="**/*.sol")
+
+# Find decimal handling
+Grep("decimals\\(\\)|10\\*\\*.*decimals", glob="**/*.sol")
+```

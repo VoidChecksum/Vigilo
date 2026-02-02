@@ -336,3 +336,156 @@ function earned(address user) public view returns (uint256) {
 - Dust stuck in contract
 - Boost manipulation
 - Reward token update desync
+
+---
+
+## Liquid Staking Derivatives (LSD) Patterns (2025-2026)
+
+### Overview
+
+LSDs (stETH, rETH, cbETH, etc.) introduce unique vulnerabilities when used in DeFi protocols.
+
+### 1. stETH Rebasing Integration
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Caches stETH balance
+mapping(address => uint256) public deposits;
+
+function deposit(uint256 amount) external {
+    stETH.transferFrom(msg.sender, address(this), amount);
+    deposits[msg.sender] = amount;  // @audit Becomes stale after rebase!
+}
+
+function withdraw() external {
+    uint256 amount = deposits[msg.sender];
+    stETH.transfer(msg.sender, amount);  // @audit May not have enough after negative rebase
+}
+```
+
+**Secure Pattern:**
+```solidity
+// Use wstETH (wrapped stETH) which doesn't rebase
+// Or track shares instead of amounts
+function deposit(uint256 amount) external {
+    uint256 sharesBefore = stETH.sharesOf(address(this));
+    stETH.transferFrom(msg.sender, address(this), amount);
+    uint256 sharesReceived = stETH.sharesOf(address(this)) - sharesBefore;
+    userShares[msg.sender] += sharesReceived;
+}
+```
+
+**Search Queries:**
+```
+Grep("stETH|wstETH|Lido|sharesOf", glob="**/*.sol")
+```
+
+### 2. LSD Depeg Risk in Lending
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Assumes 1:1 peg
+function getCollateralValue(address user) view returns (uint256) {
+    uint256 stEthAmount = stETH.balanceOf(user);
+    return stEthAmount * ethPrice / 1e18;  // @audit Assumes stETH = ETH!
+}
+```
+
+**Historical Depeg Events:**
+- stETH depegged ~5% in June 2022
+- rETH has traded at premiums/discounts
+- cbETH experienced volatility during market stress
+
+**Secure Pattern:**
+```solidity
+function getCollateralValue(address user) view returns (uint256) {
+    uint256 stEthAmount = stETH.balanceOf(user);
+    uint256 stEthPrice = oracle.getPrice(address(stETH));  // Use actual price
+    return stEthAmount * stEthPrice / 1e18;
+}
+```
+
+### 3. Withdrawal Queue Vulnerabilities
+
+**LSDs have withdrawal delays:**
+| LSD | Withdrawal Time | Mechanism |
+|-----|-----------------|-----------|
+| stETH | 1-5 days | Request queue |
+| rETH | Variable | Burn for ETH |
+| cbETH | Instant* | Trade on DEX |
+
+*cbETH doesn't have native redemption, only DEX trading
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Assumes instant withdrawal
+function liquidate(address user) external {
+    uint256 stEth = collateral[user];
+    stETH.transfer(liquidator, stEth);  // @audit Liquidator can't quickly sell!
+}
+```
+
+### 4. Restaking Integration (EigenLayer)
+
+When LSDs are restaked:
+
+**Risk Chain:**
+```
+ETH → Lido (stETH) → EigenLayer → AVS
+      ↓ Risk 1       ↓ Risk 2    ↓ Risk 3
+    Slashing      Slashing     Slashing
+```
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Not accounting for restaking risk
+function acceptCollateral(address token) external view returns (bool) {
+    return token == address(stETH);  // @audit Is this stETH restaked? Higher risk!
+}
+```
+
+**Search Queries:**
+```
+Grep("EigenLayer|restake|AVS|operator", glob="**/*.sol")
+Grep("rETH|cbETH|frxETH|sfrxETH", glob="**/*.sol")
+```
+
+---
+
+## LSD Audit Checklist
+
+### Rebasing Tokens (stETH)
+- [ ] Uses shares not amounts for accounting
+- [ ] Or uses wrapped version (wstETH)
+- [ ] Handles negative rebase scenarios
+
+### Price/Peg
+- [ ] Uses oracle for LSD price (not 1:1 assumption)
+- [ ] Circuit breaker for extreme depeg
+- [ ] Liquidation accounts for depeg risk
+
+### Withdrawals
+- [ ] Understands withdrawal delay
+- [ ] Liquidation mechanism accounts for illiquidity
+- [ ] Emergency scenarios handled
+
+### Restaking
+- [ ] Knows if LSD is restaked
+- [ ] Additional slashing risk priced in
+- [ ] Operator risk considered
+
+---
+
+## Search Query Reference
+
+```
+# Find LSD usage
+Grep("stETH|wstETH|rETH|cbETH|frxETH|sfrxETH", glob="**/*.sol")
+Grep("Lido|RocketPool|Coinbase|Frax", glob="**/*.sol")
+
+# Find rebasing handling
+Grep("sharesOf|getSharesByPooledEth|getPooledEthByShares", glob="**/*.sol")
+
+# Find restaking
+Grep("EigenLayer|restake|restaking|AVS", glob="**/*.sol")
+```

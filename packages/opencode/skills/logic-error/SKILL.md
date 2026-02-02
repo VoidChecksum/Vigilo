@@ -10,7 +10,7 @@ user-invocable: false
 
 # Business Logic Vulnerability Analysis
 
-**2025 Statistics**: Logic errors caused **$63.8M+** losses, Input validation = **34.6% of vulnerabilities**, Rounding attacks (Bunni) = **$2.4M-$8.3M**.
+**OWASP SC03:2025** - Logic Errors rank **#3** in OWASP Smart Contract Top 10 (2025). Combined with SC04 (Input Validation), these account for **34.6% of all vulnerabilities** and **$180M+ in 2024-2025 losses**, including Bunni rounding attack ($2.4M-$8.3M).
 
 ---
 
