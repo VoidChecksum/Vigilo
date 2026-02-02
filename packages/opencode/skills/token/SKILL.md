@@ -430,6 +430,21 @@ Grep("ERC1363|transferAndCall|approveAndCall|onApprovalReceived", glob="**/*.sol
 
 ---
 
+### 13. ERC-6909 Minimal Multi-Token
+
+Streamlined ERC-1155 alternative: no callbacks, no batching, per-token granular approvals.
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Missing per-token allowance check
+require(isApprovedForAll[from][msg.sender], "Not approved");
+balanceOf[from][id] -= amount; // @audit allowance[from][msg.sender][id]?
+```
+
+**Search:** `Grep("ERC6909|isApprovedForAll|allowance.*id", glob="**/*.sol")`
+
+---
+
 ## Updated Token Compatibility Matrix (2025-2026)
 
 | Token | Fee | Rebase | Blacklist | Callback | Permit | Notes |
@@ -442,6 +457,7 @@ Grep("ERC1363|transferAndCall|approveAndCall|onApprovalReceived", glob="**/*.sol
 | WBTC | No | No | No | No | No | 8 decimals |
 | PAXG | Yes | No | No | No | No | 0.02% fee |
 | ERC777 | No | No | No | Yes | No | Deprecated |
+| ERC-6909 | No | No | No | No | No | Minimal multi-token |
 | LRTs | Varies | No | No | No | Yes | Check implementation |
 
 *USDT has fee mechanism but set to 0

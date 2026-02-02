@@ -369,6 +369,70 @@ Grep("ProxyAdmin|TransparentUpgradeableProxy", glob="**/*.sol")
 Grep("changeProxyAdmin|transferOwnership", glob="**/*.sol")
 ```
 
+### Pattern 8: Storage Collision Prevention (ERC-7201)
+
+**Root Cause**: Unnamespaced Storage in Upgradeable Contracts
+
+ERC-7201 introduces namespaced storage to prevent collisions when inheriting from multiple upgradeable contracts. Without it, storage slots can collide across inheritance chains.
+
+```solidity
+// VULNERABLE: Sequential storage without namespacing
+contract VaultV1 {
+    address public owner;     // slot 0
+    uint256 public balance;   // slot 1
+}
+
+// When inherited by child contract, slots collide
+contract ChildVault is VaultV1 {
+    address public admin;     // slot 0 - COLLISION with owner!
+    uint256 public fee;       // slot 1 - COLLISION with balance!
+}
+```
+
+**Attack Flow**:
+1. Parent contract uses slots 0-1
+2. Child contract adds variables
+3. Child's variables overwrite parent's storage
+4. State corruption and access control bypass
+
+**Secure Pattern (ERC-7201)**:
+```solidity
+// @custom:storage-location erc7201:myprotocol.vault
+contract VaultV1 is Initializable {
+    struct VaultStorage {
+        address owner;
+        uint256 balance;
+    }
+    
+    bytes32 private constant VAULT_STORAGE_LOCATION = 
+        keccak256(abi.encode(uint256(keccak256("myprotocol.vault")) - 1)) & ~bytes32(uint256(0xff));
+    
+    function _getVaultStorage() private pure returns (VaultStorage storage $) {
+        assembly {
+            $.slot := VAULT_STORAGE_LOCATION
+        }
+    }
+    
+    function initialize(address _owner) external initializer {
+        VaultStorage storage $ = _getVaultStorage();
+        $.owner = _owner;
+    }
+}
+```
+
+**Search Queries**:
+```
+Grep("@custom:storage-location|erc7201|erc-7201", glob="**/*.sol")
+Grep("keccak256.*abi.encode.*keccak256", glob="**/*.sol")
+Grep("bytes32.*STORAGE_LOCATION", glob="**/*.sol")
+```
+
+**Detection**:
+- Check for `@custom:storage-location` NatSpec annotations
+- Verify storage location calculation uses ERC-7201 formula
+- Confirm assembly block uses correct slot offset
+- Validate namespace ID is unique per contract
+
 ---
 
 ## Upgradeability Audit Checklist
@@ -385,6 +449,9 @@ Grep("changeProxyAdmin|transferOwnership", glob="**/*.sol")
 - [ ] New variables only appended
 - [ ] Inheritance order preserved
 - [ ] Storage gaps for future inheritance
+- [ ] ERC-7201 namespaced storage used (if multiple inheritance)
+- [ ] `@custom:storage-location` annotations present
+- [ ] Storage location calculation correct (keccak256 formula)
 
 ### UUPS Specific
 - [ ] `_authorizeUpgrade` has proper access control

@@ -262,6 +262,63 @@ Grep("_setRoleAdmin|getRoleAdmin", glob="**/*.sol")
 - Who holds DEFAULT_ADMIN_ROLE?
 - Is there a two-step admin transfer?
 - Can admin roles be renounced?
+### Pattern 7: ERC-4337 Account Abstraction Vulnerabilities
+
+**Root Cause**: Misunderstanding of EntryPoint trust model and Paymaster authorization
+
+```solidity
+// VULNERABLE: Paymaster doesn't validate caller
+contract BadPaymaster {
+    function validatePaymasterUserOp(
+        UserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) external view returns (bytes memory context, uint256 validationData) {
+        // @audit No check that EntryPoint is canonical!
+        // @audit No validation of userOp.sender (account contract)
+        // Attacker can call this directly with arbitrary userOp
+        return ("", 0);
+    }
+}
+
+// VULNERABLE: EntryPoint not validated
+contract BadAccount {
+    function validateUserOp(
+        UserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) external returns (uint256 validationData) {
+        // @audit No check that msg.sender is canonical EntryPoint
+        // Attacker can call this with fake signature
+        require(isValidSignature(userOp.signature, userOpHash), "Invalid sig");
+        return 0;
+    }
+}
+
+// VULNERABLE: Bundler can manipulate gas
+function executeUserOp(UserOperation calldata userOp) external {
+    // @audit No validation that bundler is trusted
+    // Bundler can submit UserOp with inflated gas, drain paymaster
+}
+```
+
+**Search Queries**:
+```
+Grep("validatePaymasterUserOp|validateUserOp", glob="**/*.sol")
+Grep("EntryPoint|IEntryPoint", glob="**/*.sol")
+Grep("UserOperation|userOp", glob="**/*.sol")
+Grep("Paymaster|paymaster", glob="**/*.sol")
+```
+
+**Verification Questions**:
+- Is the EntryPoint address hardcoded and canonical?
+- Does Paymaster validate that msg.sender is EntryPoint?
+- Does Account validate that msg.sender is EntryPoint?
+- Can Paymaster be called directly by attackers?
+- Does Paymaster check userOp.sender (account contract)?
+- Is there a whitelist of trusted Paymasters?
+- Can bundlers manipulate gas prices or limits?
+- Is signature validation done correctly (UserOp hash vs transaction hash)?
 
 ---
 
@@ -275,6 +332,17 @@ For each external/public function:
 - [ ] Can the require/revert condition be bypassed?
 - [ ] Who is the intended caller? Is this documented?
 - [ ] What is the worst case if anyone can call this?
+
+### ERC-4337 Specific Checks (if applicable)
+
+- [ ] Is EntryPoint address hardcoded and canonical?
+- [ ] Does Paymaster validate msg.sender == EntryPoint?
+- [ ] Does Account validate msg.sender == EntryPoint?
+- [ ] Can Paymaster be called directly by non-EntryPoint callers?
+- [ ] Does Paymaster validate userOp.sender (account contract)?
+- [ ] Is there a whitelist of trusted Paymasters?
+- [ ] Can bundlers manipulate gas prices or operation limits?
+- [ ] Is signature validation using correct hash (UserOp vs transaction)?
 
 ---
 
