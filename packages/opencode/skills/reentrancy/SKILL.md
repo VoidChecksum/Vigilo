@@ -307,6 +307,9 @@ function mint(uint256 id, uint256 amount) external {
 | ERC777 | tokensReceived, tokensToSend | transfer, transferFrom |
 | ERC1155 | onERC1155Received | safeTransferFrom, mint |
 | ERC1363 | onTransferReceived | transferAndCall |
+| ERC6909 | None | N/A (no callbacks by design) |
+
+**Note on ERC-6909**: ERC-6909 deliberately removed callback hooks to prevent reentrancy vulnerabilities. This makes it a safer alternative to ERC-1155 for protocols prioritizing reentrancy resistance over callback flexibility.
 
 **Search Queries**:
 ```

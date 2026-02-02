@@ -467,6 +467,40 @@ Grep("OApp|lz-evm-oapp|srcEid|_lzReceive", glob="**/*.sol")
 
 ---
 
+### Axelar General Message Passing (GMP)
+
+**Key Security Checks:**
+```solidity
+contract MyAxelarReceiver is AxelarExecutable {
+    function _execute(
+        string calldata sourceChain,
+        string calldata sourceAddress,
+        bytes calldata payload
+    ) internal override {
+        // 1. Gateway validation (canonical gateway only)
+        require(msg.sender == address(gateway), "Invalid gateway");
+        // 2. Source chain validation
+        require(keccak256(bytes(sourceChain)) == keccak256(bytes("ethereum")), "Invalid chain");
+        // 3. Source address validation
+        require(trustedSenders[sourceChain] == stringToAddress(sourceAddress), "Invalid sender");
+        _processMessage(payload);
+    }
+}
+```
+
+**Axelar-Specific Risks:**
+- Gateway address not validated (must be canonical gateway)
+- Gas service payment not verified (underfunded messages fail silently)
+- Command execution replay via missing CommandID tracking
+- Source chain/address validation missing
+
+**Search Queries:**
+```
+Grep("AxelarExecutable|_execute|IAxelarGateway", glob="**/*.sol")
+```
+
+---
+
 ### L2-to-L2 Messaging (2025-2026 Trend)
 
 With L2 proliferation, direct L2-to-L2 messaging is emerging:

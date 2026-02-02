@@ -317,9 +317,51 @@ Grep("fallback.*oracle|backup.*price|secondary.*feed", glob="**/*.sol")
 
 ---
 
+### 12. Chronicle Protocol (Scribe)
+
+**Architecture:**
+Chronicle implements Scribe, a Schnorr multi-signature based optimistic oracle. Key components:
+- **Schnorr Signatures**: Aggregated multi-signature scheme (constant verification cost regardless of validator count)
+- **Optimistic Poke**: `opPoke()` submits price updates optimistically; signature verified only if challenged
+- **Challenge Period**: 10-minute window to challenge invalid signatures (as of Feb 2025)
+- **Toll Gate**: Whitelisted addresses only can read prices on-chain
+
+**Vulnerable Pattern:**
+```solidity
+// DANGEROUS: Not validating Schnorr signature or challenge period
+IScribe scribe = IScribe(0x...);
+uint256 price = scribe.read();  // @audit No freshness or signature check!
+```
+
+**Secure Pattern:**
+```solidity
+// SECURE: Verify price freshness and challenge period
+IScribe scribe = IScribe(0x...);
+(uint256 price, uint256 timestamp) = scribe.readWithAge();
+require(block.timestamp - timestamp < MAX_AGE, "Stale price");
+// Challenge period: verify no active challenge window
+require(scribe.isChallenged() == false, "Price challenged");
+```
+
+**Critical Vulnerabilities:**
+- **Stale Poke Data**: Using price before challenge period expires
+- **Signature Bypass**: Calling `read()` without validating Schnorr aggregation
+- **Toll Gate Bypass**: Non-whitelisted caller accessing price feed
+- **Challenge Frontrun**: Submitting transaction during active challenge
+
+**Search Queries:**
+```
+Grep("IScribe|opPoke|poke\\(|read\\(|Chronicle", glob="**/*.sol")
+Grep("scribe\\.read|scribe\\.poke", glob="**/*.sol")
+```
+
+---
+
 ## References
 
 For detailed Chainlink integration patterns, see:
 - Chainlink Docs: https://docs.chain.link
 - Pyth Network: https://docs.pyth.network
 - API3: https://docs.api3.org
+- Chronicle Protocol: https://chroniclelabs.org
+- Scribe Docs: https://docs.chronicle.build
