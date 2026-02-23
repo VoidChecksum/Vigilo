@@ -30,16 +30,33 @@ Vigilo is an autonomous security legion for smart contract auditing, inspired by
 
 ### The Legion
 
-| Agent | Latin Role | Mission |
-|-------|-----------|---------|
-| **Vigilo** | Commander (*Imperator*) | Orchestrates the full audit pipeline |
-| **Quaestor** | Investigator (*Quaestor*) | Pre-audit interview & scope planning |
-| **Explorator** | Scout (*Exploratores*) | Code reconnaissance — maps structure and flows |
-| **Speculator** | Intelligence (*Speculatores*) | Documentation intel — extracts design and invariants |
-| **Centuriones** | Officers (*Centuriones*) | 8 specialist auditors deployed by protocol type |
+| Agent | Mission |
+|-------|---------|
+| **Vigilo** | Orchestrates the full audit pipeline |
+| **Quaestor** | Pre-audit interview & scope planning |
+| **Explorator** | Code reconnaissance — maps structure and flows |
+| **Speculator** | Documentation intel — extracts design and invariants |
+| **Centuriones** | 8 specialist auditors deployed by protocol type |
 
 <p align="center">
   <img src=".github/assets/opencode.png" alt="Vigilo running in OpenCode" width="720">
+</p>
+
+## Proven in the Wild
+Real vulnerabilities found by Vigilo in live audit contests.
+
+> **All I did was specify the target project and submit the report. Vigilo did the rest.**
+
+<p align="center">
+  <a href="./findings/cantina-rounding-accumulation.md">
+    <img src=".github/assets/findings/cantina-rounding-accumulation.png" alt="Cantina High Severity Finding" width="600">
+  </a>
+</p>
+
+<p align="center">
+  <em>Cantina — Ceiling Rounding Accumulation (High, Accepted)</em>
+  <br>
+  <a href="./findings/cantina-rounding-accumulation.md">View full report</a>
 </p>
 
 ---
