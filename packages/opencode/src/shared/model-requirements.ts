@@ -12,14 +12,14 @@ export type ModelRequirement = {
 export const AUDITOR_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   vigilo: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
   },
   quaestor: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
