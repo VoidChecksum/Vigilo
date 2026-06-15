@@ -35,6 +35,10 @@ export type BuiltinAuditorName =
   | "defi-auditor"
   | "cross-chain-auditor"
   | "token-auditor"
+  | "purifier"
+  | "verifier"
+  | "triage"
+  | "validator"
 
 export type AuditorOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string

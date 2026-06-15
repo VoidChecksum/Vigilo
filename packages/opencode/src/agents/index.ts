@@ -7,6 +7,12 @@ export * from "./faber"
 export * from "./utils"
 export * from "./dynamic-prompt-builder"
 
+// New verification and quality agents
+export * from "./purifier"
+export * from "./verifier"
+export * from "./triage"
+export * from "./validator"
+
 export {
   AUDITOR_FACTORIES,
   AUDITOR_METADATA,
