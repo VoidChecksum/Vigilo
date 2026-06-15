@@ -189,6 +189,11 @@ docs/
 # VIGILO SPECIFIC
 # =============================================================================
 
+# Build artifacts (binaries)
+packages/opencode/packages/*/bin/
+**/packages/*/bin/
+*.map
+
 # Audit output (generated during runtime)
 .vigilo
 .vigilo/
