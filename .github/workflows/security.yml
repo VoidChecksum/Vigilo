@@ -26,8 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
+      # Advisory: the action requires GitHub's Dependency Graph (and GHAS on
+      # private repos), which is not available on every fork. continue-on-error
+      # keeps it from hard-failing PRs where the graph is unavailable; on a repo
+      # with the graph enabled it still surfaces high-severity dependency issues.
       - name: Dependency Review
         uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        continue-on-error: true
         with:
           fail-on-severity: high
 
