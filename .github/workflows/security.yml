@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@38ecb5b593bf2d7626234a74e46ac14838ad6e5b # v4.7.1
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
         with:
           fail-on-severity: high
 
@@ -146,7 +146,7 @@ jobs:
           persist-credentials: false
 
       - name: Run OpenSSF Scorecard
-        uses: ossf/scorecard-action@05b42c624433fc40578a4c6e6baa273bab2c31ba # v2.4.3
+        uses: ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2 # v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
