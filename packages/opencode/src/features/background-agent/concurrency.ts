@@ -12,13 +12,28 @@ interface QueueEntry {
   settled: boolean
 }
 
+/** Recommended cap on TOTAL concurrent background agents across all models to bound */
+/** runaway fan-out (e.g. set `maxConcurrentTasks: 3` to enforce the documented "max */
+/** parallel auditors"). Opt-in: disabled by default to preserve existing behavior. */
+export const RECOMMENDED_MAX_CONCURRENT_TASKS = 3
+
 export class ConcurrencyManager {
   private config?: BackgroundTaskConfig
   private counts: Map<string, number> = new Map()
   private queues: Map<string, QueueEntry[]> = new Map()
+  // Global (cross-key) cap — a second semaphore dimension.
+  private globalCount = 0
+  private globalQueue: QueueEntry[] = []
 
   constructor(config?: BackgroundTaskConfig) {
     this.config = config
+  }
+
+  /** Total-concurrency cap across all keys. Opt-in: disabled unless configured. */
+  getGlobalLimit(): number {
+    const v = this.config?.maxConcurrentTasks
+    if (v === undefined || v === 0) return Infinity
+    return v
   }
 
   getConcurrencyLimit(model: string): number {
@@ -38,7 +53,62 @@ export class ConcurrencyManager {
     return 5
   }
 
-  async acquire(model: string): Promise<void> {
+  acquire(model: string): Promise<void> {
+    // When the global cap is disabled, return the per-key acquire promise directly
+    // (no extra await/microtask) so timing matches the original single-dimension impl.
+    if (this.getGlobalLimit() === Infinity) {
+      return this.acquireKey(model)
+    }
+    // Otherwise acquire the GLOBAL slot before the per-key slot (consistent order ⇒
+    // deadlock-free); release() releases key-then-global, riding the same release
+    // sites so there are no extra leak paths.
+    return this.acquireGlobalThenKey(model)
+  }
+
+  private async acquireGlobalThenKey(model: string): Promise<void> {
+    await this.acquireGlobal()
+    await this.acquireKey(model)
+  }
+
+  release(model: string): void {
+    this.releaseKey(model)
+    this.releaseGlobal()
+  }
+
+  private async acquireGlobal(): Promise<void> {
+    const limit = this.getGlobalLimit()
+    if (limit === Infinity) return
+    if (this.globalCount < limit) {
+      this.globalCount++
+      return
+    }
+    return new Promise<void>((resolve, reject) => {
+      const entry: QueueEntry = {
+        resolve: () => {
+          if (entry.settled) return
+          entry.settled = true
+          resolve()
+        },
+        rawReject: reject,
+        settled: false,
+      }
+      this.globalQueue.push(entry)
+    })
+  }
+
+  private releaseGlobal(): void {
+    if (this.getGlobalLimit() === Infinity) return
+    while (this.globalQueue.length > 0) {
+      const next = this.globalQueue.shift()!
+      if (!next.settled) {
+        next.resolve() // hand off the slot (count unchanged)
+        return
+      }
+    }
+    if (this.globalCount > 0) this.globalCount--
+  }
+
+  private async acquireKey(model: string): Promise<void> {
     const limit = this.getConcurrencyLimit(model)
     if (limit === Infinity) {
       return
@@ -68,7 +138,7 @@ export class ConcurrencyManager {
     })
   }
 
-  release(model: string): void {
+  private releaseKey(model: string): void {
     const limit = this.getConcurrencyLimit(model)
     if (limit === Infinity) {
       return
@@ -103,6 +173,11 @@ export class ConcurrencyManager {
         if (!entry.settled) {
           entry.settled = true
           entry.rawReject(new Error(`Concurrency queue cancelled for model: ${model}`))
+          // With the global cap enabled, a queued key-waiter already holds a
+          // global slot it acquired before queueing on the per-key dimension.
+          // Release it so globalCount doesn't leak (it would otherwise throttle
+          // all future tasks). No-op when the global cap is disabled.
+          this.releaseGlobal()
         }
       }
       this.queues.delete(model)
@@ -114,11 +189,27 @@ export class ConcurrencyManager {
    * Cancels all pending waiters.
    */
   clear(): void {
+    // Reset the global dimension FIRST so the per-key cancellation below (which
+    // now calls releaseGlobal per cancelled waiter) just no-ops on the global
+    // side instead of handing a slot to a waiter mid-shutdown.
+    for (const entry of this.globalQueue) {
+      if (!entry.settled) {
+        entry.settled = true
+        entry.rawReject(new Error("Concurrency queue cancelled (global)"))
+      }
+    }
+    this.globalQueue = []
+    this.globalCount = 0
     for (const [model] of this.queues) {
       this.cancelWaiters(model)
     }
     this.counts.clear()
     this.queues.clear()
+  }
+
+  /** Current global in-flight count (for tests/debugging). */
+  getGlobalCount(): number {
+    return this.globalCount
   }
 
   /**

@@ -8,7 +8,7 @@
   },
   "repository": "https://github.com/PurpleAILAB/Vigilo",
   "homepage": "https://github.com/PurpleAILAB/Vigilo",
-  "license": "BSL-1.1",
+  "license": "MIT",
   "keywords": [
     "security",
     "audit",

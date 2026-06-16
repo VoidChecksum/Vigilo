@@ -30,6 +30,7 @@ permissions:
 jobs:
   publish-platform:
     runs-on: ${{ matrix.platform == 'windows-x64' && 'windows-latest' || 'ubuntu-latest' }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -39,13 +40,13 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -91,13 +92,13 @@ jobs:
             linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
             windows-x64) TARGET="bun-windows-x64" ;;
           esac
-          
+
           if [ "$PLATFORM" = "windows-x64" ]; then
             OUTPUT="packages/${PLATFORM}/bin/vigilo.exe"
           else
             OUTPUT="packages/${PLATFORM}/bin/vigilo"
           fi
-          
+
           bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
 
       - name: Publish ${{ matrix.platform }}

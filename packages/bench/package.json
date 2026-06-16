@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/PurpleAILAB/Vigilo"
   },
-  "license": "BUSL-1.1",
+  "license": "MIT",
   "bin": {
     "vigilo-bench": "./dist/cli.js"
   },

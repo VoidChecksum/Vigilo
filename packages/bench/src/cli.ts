@@ -5,6 +5,7 @@ import { score } from "./commands/score.js";
 import { scoreBaseline_ } from "./commands/score-baseline.js";
 import { report } from "./commands/report.js";
 import { pipeline } from "./commands/pipeline.js";
+import { BenchError } from "./utils.js";
 
 const program = new Command()
   .name("bench")
@@ -28,6 +29,7 @@ program
   .description("Score Vigilo findings against ground truth using LLM")
   .option("--iterations <n>", "Number of LLM iterations for majority voting", "3")
   .option("--batch-size <n>", "Findings per batch", "10")
+  .option("--runs <n>", "Re-score N times and report run-to-run stability (mean ± stddev)", "1")
   .option("-v, --verbose", "Show detailed scoring process (prompts, iterations, votes)")
   .action(score);
 
@@ -46,4 +48,10 @@ program
   .option("--all", "Aggregate report across all scored contests")
   .action(report);
 
-program.parse();
+program.parseAsync().catch((err) => {
+  // BenchError already printed its message via error(); anything else is unexpected.
+  if (!(err instanceof BenchError)) {
+    console.error(`[bench] ERROR: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  process.exit(1);
+});

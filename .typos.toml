@@ -1,0 +1,46 @@
+# typos-cli configuration for Vigilo
+# Docs: https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = [
+  "bun.lock",
+  "package-lock.json",
+  "dist/",
+  "node_modules/",
+]
+
+# Domain vocabulary that typos would otherwise flag. Mapping a word to itself
+# tells typos the spelling is intentional.
+[default.extend-words]
+vigilo = "vigilo"
+quaestor = "quaestor"
+explorator = "explorator"
+speculator = "speculator"
+centuriones = "centuriones"
+faber = "faber"
+litellm = "litellm"
+skillogy = "skillogy"
+langgraph = "langgraph"
+solidity = "solidity"
+vyper = "vyper"
+cairo = "cairo"
+foundry = "foundry"
+echidna = "echidna"
+mythril = "mythril"
+slither = "slither"
+semgrep = "semgrep"
+sarif = "sarif"
+hardhat = "hardhat"
+natspec = "natspec"
+calldata = "calldata"
+blockhash = "blockhash"
+randao = "randao"
+defi = "defi"
+erc = "erc"
+openzeppelin = "openzeppelin"
+solmate = "solmate"
+solady = "solady"
+reentrancy = "reentrancy"
+flashloan = "flashloan"
+opplan = "opplan"
+conops = "conops"

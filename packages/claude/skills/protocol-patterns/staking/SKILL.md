@@ -1,5 +1,5 @@
 ---
-name: Staking Protocol Patterns
+name: staking
 description: >
   Auto-loaded by defi-auditor agent during Phase 2 when analyzing staking mechanisms.
   Provides patterns for: reward-per-token accumulator (Synthetix style), lock periods,

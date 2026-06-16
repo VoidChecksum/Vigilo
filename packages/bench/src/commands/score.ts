@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
-import { ensureDirs, SOURCES_DIR, TRUTH_DIR, SCORES_DIR, loadRegistry, saveRegistry, loadScorerConfig, loadBaseline, computeBaselineComparison, log, error } from "../utils.js";
+import { ensureDirs, SOURCES_DIR, TRUTH_DIR, SCORES_DIR, loadRegistry, saveRegistry, loadScorerConfig, loadBaseline, computeBaselineComparison, summarizeRuns, log, error } from "../utils.js";
 import { parseVigiloFindings } from "../parsers/vigilo-findings.js";
 import { runScorer } from "../scorer/llm-scorer.js";
+import { resetUsageTotals, getUsageTotals } from "../client/opencode.js";
 import type { ScaBenchVulnerability } from "../types.js";
 
 function formatTimestamp(date: Date): string {
@@ -13,6 +14,7 @@ interface ScoreOptions {
   iterations?: string;
   batchSize?: string;
   verbose?: boolean;
+  runs?: string;
 }
 
 export async function score(contestId: string, options: ScoreOptions = {}): Promise<void> {
@@ -39,10 +41,52 @@ export async function score(contestId: string, options: ScoreOptions = {}): Prom
   log(`Using model: ${config.model}`);
   log(`Iterations: ${config.iterations}, Batch size: ${config.batchSize}${config.verbose ? ", Verbose: ON" : ""}`);
 
+  resetUsageTotals();
   const startTime = Date.now();
   const result = await runScorer(contestId, truthFindings, vigiloFindings, config, null);
   const scoringDuration = Date.now() - startTime;
   result.audit_duration_ms = scoringDuration;
+
+  // Pick up the AUDIT run's cost, if the pipeline captured it (.vigilo/audit-cost.json).
+  const auditCostPath = resolve(SOURCES_DIR, contestId, ".vigilo", "audit-cost.json");
+  if (existsSync(auditCostPath)) {
+    try {
+      const ac = JSON.parse(readFileSync(auditCostPath, "utf-8")) as { cost_usd?: number; tokens?: number };
+      result.audit_cost_usd = ac.cost_usd ?? null;
+      result.audit_tokens = ac.tokens ?? null;
+    } catch {
+      /* ignore malformed audit-cost file */
+    }
+  }
+
+  // Optional reproducibility sweep: re-score N times and report run-to-run variance,
+  // so detection-rate claims are falsifiable (the LLM judge is non-deterministic).
+  const runsN = Math.max(1, parseInt(options.runs || "1", 10));
+  if (runsN > 1) {
+    const detectionRates = [result.detection_rate];
+    const f1s = [result.f1_score];
+    for (let r = 2; r <= runsN; r++) {
+      log(`Stability run ${r}/${runsN}...`);
+      const extra = await runScorer(contestId, truthFindings, vigiloFindings, config, null);
+      detectionRates.push(extra.detection_rate);
+      f1s.push(extra.f1_score);
+    }
+    const dr = summarizeRuns(detectionRates);
+    const f1 = summarizeRuns(f1s);
+    result.stability = { runs: runsN, detection_rate: dr, f1_score: f1 };
+    log(
+      `Stability over ${runsN} runs — detection_rate ${(dr.mean * 100).toFixed(1)}% ± ${(dr.stddev * 100).toFixed(1)} ` +
+        `(min ${(dr.min * 100).toFixed(1)}, max ${(dr.max * 100).toFixed(1)}); ` +
+        `f1 ${(f1.mean * 100).toFixed(1)}% ± ${(f1.stddev * 100).toFixed(1)}`
+    );
+  }
+
+  // Capture the scorer's own token/cost spend AFTER all scoring runs, so --runs N
+  // reflects total spend rather than only the first pass (0 when the provider
+  // doesn't report usage).
+  const usage = getUsageTotals();
+  result.scoring_cost_usd = usage.cost || null;
+  result.scoring_tokens = usage.tokens || null;
 
   const baseline = loadBaseline(contestId);
   if (baseline) {

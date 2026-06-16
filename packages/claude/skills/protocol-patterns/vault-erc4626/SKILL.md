@@ -1,5 +1,5 @@
 ---
-name: ERC4626 Vault Patterns
+name: vault-erc4626
 description: >
   Auto-loaded by defi-auditor agent during Phase 2 when analyzing ERC4626 vaults.
   Provides patterns for: share/asset conversion, inflation attack mitigations,

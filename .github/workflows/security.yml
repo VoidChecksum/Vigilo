@@ -1,0 +1,160 @@
+name: Security
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 06:30 UTC
+    - cron: "30 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dependency-review:
+    # Dependency Review only runs in the context of a pull request.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@38ecb5b593bf2d7626234a74e46ac14838ad6e5b # v4.7.1
+        with:
+          fail-on-severity: high
+
+  semgrep:
+    # Runs Vigilo's custom Solidity Semgrep ruleset against the regression
+    # fixtures and publishes the findings to GitHub Code Scanning.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install semgrep
+        run: pipx install semgrep
+
+      - name: Scan vulnerable fixtures (expected to find issues)
+        # --error makes a non-zero exit on findings; the vulnerable fixtures are
+        # supposed to trip the rules, so keep going and still emit the SARIF.
+        run: |
+          semgrep \
+            --config .semgrep/vigilo-rules.yml \
+            --error \
+            --sarif \
+            --output semgrep.sarif \
+            tests/semgrep-fixtures/vulnerable || true
+          test -f semgrep.sarif
+
+      - name: Verify safe fixtures stay clean (no false positives)
+        # The safe/fixed counterparts must trigger ZERO findings. --error means a
+        # non-zero exit here is a real regression, so this step is allowed to fail
+        # the job.
+        run: |
+          semgrep \
+            --config .semgrep/vigilo-rules.yml \
+            --error \
+            tests/semgrep-fixtures/safe
+
+      - name: Upload SARIF to Code Scanning
+        if: ${{ always() && hashFiles('semgrep.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3.36.2
+        with:
+          sarif_file: semgrep.sarif
+          category: vigilo-semgrep
+
+  dependency-audit:
+    # Weekly (and on-demand) dependency-vulnerability sweep across the workspaces —
+    # the analogue of a scheduled pip-audit. Informational: advisories are surfaced in
+    # the job summary for maintainer review rather than hard-failing the schedule.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Audit dependencies
+        run: |
+          set -uo pipefail
+          echo "## Dependency audit" >> "$GITHUB_STEP_SUMMARY"
+          for pkg in packages/opencode packages/bench; do
+            echo "### $pkg" >> "$GITHUB_STEP_SUMMARY"
+            ( cd "$pkg" && bun install --frozen-lockfile >/dev/null 2>&1 || bun install >/dev/null 2>&1
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              bun audit 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+              echo '```' >> "$GITHUB_STEP_SUMMARY" )
+          done
+
+  codeql:
+    # Static analysis of Vigilo's OWN TypeScript (it audits others' Solidity — its
+    # own agent code deserves the same scrutiny). Source-only; no build needed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3.36.2
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3.36.2
+        with:
+          category: "/language:javascript-typescript"
+
+  scorecard:
+    # Scorecard analysis runs on pushes to the default branch and weekly.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@05b42c624433fc40578a4c6e6baa273bab2c31ba # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5

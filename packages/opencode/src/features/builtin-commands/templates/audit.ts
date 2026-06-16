@@ -16,31 +16,22 @@ Orchestrates the complete audit workflow from scope resolution to final report.
 
 ## Session Management
 
-### Check for Existing Audit State
+### Initialize or Resume Audit State
 
-**FIRST**, check if \`.vigilo/audit-state.json\` exists:
+**FIRST**, call the typed audit-plan tools (do NOT hand-edit \`.vigilo/audit-state.json\`):
 
-\`\`\`json
-{
-  "protocol_name": "Protocol Name",
-  "protocol_type": "Vault/ERC4626",
-  "platform": "code4rena",
-  "started_at": "ISO_TIMESTAMP",
-  "session_ids": ["session_id_1"],
-  "current_phase": "analysis",
-  "completed_phases": ["scope", "recon"],
-  "scope_file": "scope.txt"
-}
+\`\`\`
+plan_init({ protocol_name, protocol_type, platform, scope_file })
+plan_status()
 \`\`\`
 
-**If exists AND has incomplete phases**:
-- Append current session_id to session_ids
-- Resume from current_phase
-- Print: "Resuming audit from Phase {N}: {phase_name}"
-
-**If not exists OR --resume not specified**:
-- Create new audit-state.json
-- Start from Phase 0
+- \`plan_init\` creates the plan at the \`scope\` phase, or **resumes** an existing one
+  (appending this session). \`plan_status\` reports \`current_phase\`, \`completed_phases\`,
+  and finding counts by lifecycle status.
+- **If resuming** (completed phases exist): print "Resuming audit from {current_phase}" and
+  continue at that phase — do not redo completed phases.
+- The store is the single source of truth for phases, session resume, and finding lifecycle;
+  the phase tools below keep \`current_phase\` consistent automatically.
 
 ---
 
@@ -96,7 +87,7 @@ TodoWrite([
 mkdir -p .vigilo/recon .vigilo/findings/high .vigilo/findings/medium .vigilo/poc .vigilo/reports/submissions
 \`\`\`
 
-**Update audit-state.json**: Add "scope" to completed_phases, set current_phase to "recon".
+**Advance state**: \`plan_complete_phase({ phase: "scope" })\` (auto-advances to \`recon\`).
 
 **Mark "scope" as completed. IMMEDIATELY proceed to Phase 1.**
 
@@ -138,7 +129,7 @@ Output: .vigilo/recon/docs-findings.md
 for each task_id: background_output(task_id="...")
 \`\`\`
 
-**Update audit-state.json**: Add "recon" to completed_phases, set current_phase to "analysis", save protocol_type extracted from recon.
+**Advance state**: pass the protocol_type extracted from recon via \`plan_init({ protocol_type })\`, then \`plan_complete_phase({ phase: "recon" })\` (auto-advances to \`analysis\`).
 
 **Read outputs. Mark "recon" as completed. IMMEDIATELY proceed to Phase 2.**
 
@@ -206,7 +197,7 @@ Write findings to: .vigilo/findings/{severity}/defi/
 for each task_id: background_output(task_id="...")
 \`\`\`
 
-**Update audit-state.json**: Add "analysis" to completed_phases, set current_phase to "poc".
+**Advance state**: \`plan_complete_phase({ phase: "analysis" })\` (auto-advances to \`poc\`).
 
 **Mark "analysis" as completed. IMMEDIATELY proceed to Phase 3.**
 
@@ -235,7 +226,7 @@ Example for "H-01-donation-attack-inflated-collateral":
 
 **CRITICAL**: Test passing ≠ VALIDATED. PoC must prove the claimed impact.
 
-**Update audit-state.json**: Add "poc" to completed_phases, set current_phase to "report".
+**Advance state**: \`plan_complete_phase({ phase: "poc" })\` (auto-advances to \`report\`). Record each finding's validation outcome with \`plan_record_finding({ id, severity, status })\`.
 
 **Mark "poc" as completed. IMMEDIATELY proceed to Phase 4.**
 
@@ -253,7 +244,7 @@ Generates submission-ready reports:
 
 Each report is copy-paste ready for target platform (default: Code4rena).
 
-**Update audit-state.json**: Add "report" to completed_phases, set current_phase to "complete".
+**Advance state**: \`plan_complete_phase({ phase: "report" })\` (marks the audit \`complete\`).
 
 **Mark "report" as completed.**
 

@@ -175,8 +175,4 @@ Create `.vigilo/config.json` in your project:
 
 ## License
 
-[Business Source License 1.1](../../LICENSE)
-
-- **Non-production use**: Free
-- **Production use**: Requires commercial license
-- **Change Date**: 2029-01-21 (converts to Apache-2.0)
+[MIT License](../../LICENSE) — Vigilo is free and open source for any use, including commercial.

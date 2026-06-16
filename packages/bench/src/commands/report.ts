@@ -196,15 +196,42 @@ function generateContestReport(score: ScoreResult): string {
 `;
   }
 
-  const durationStr = score.audit_duration_ms 
-    ? `_Scoring Time: ${(score.audit_duration_ms / 1000).toFixed(1)}s_\n` 
+  const durationStr = score.audit_duration_ms
+    ? `_Scoring Time: ${(score.audit_duration_ms / 1000).toFixed(1)}s_\n`
     : "";
+
+  const costParts: string[] = [];
+  if (score.scoring_tokens) costParts.push(`${score.scoring_tokens.toLocaleString()} tokens`);
+  if (score.scoring_cost_usd) {
+    costParts.push(`$${score.scoring_cost_usd.toFixed(4)}`);
+    const confirmed = score.exact_matches + score.partial_matches;
+    if (confirmed > 0) costParts.push(`$${(score.scoring_cost_usd / confirmed).toFixed(4)}/confirmed`);
+  }
+  const costStr = costParts.length ? `_Scoring Cost: ${costParts.join(" · ")}_\n` : "";
+
+  const auditCostParts: string[] = [];
+  if (score.audit_tokens) auditCostParts.push(`${score.audit_tokens.toLocaleString()} tokens`);
+  if (score.audit_cost_usd) auditCostParts.push(`$${score.audit_cost_usd.toFixed(4)}`);
+  const auditCostStr = auditCostParts.length ? `_Audit Cost: ${auditCostParts.join(" · ")}_\n` : "";
+
+  // Reproducibility sweep (`score --runs N`): surface run-to-run variance so
+  // detection-rate claims are falsifiable. mean/stddev/min/max are 0..1 fractions.
+  let stabilityStr = "";
+  if (score.stability) {
+    const s = score.stability;
+    const dr = s.detection_rate;
+    const f1 = s.f1_score;
+    stabilityStr =
+      `_Stability (${s.runs} runs): detection ${(dr.mean * 100).toFixed(1)}% ± ${(dr.stddev * 100).toFixed(1)} ` +
+      `(min ${(dr.min * 100).toFixed(1)}, max ${(dr.max * 100).toFixed(1)}); ` +
+      `F1 ${(f1.mean * 100).toFixed(1)}% ± ${(f1.stddev * 100).toFixed(1)}_\n`;
+  }
 
   return `# Vigilo Benchmark — ${score.project_id}
 
 _Generated: ${score.timestamp}_
 _Model: ${score.model}_
-${durationStr}
+${durationStr}${auditCostStr}${costStr}${stabilityStr}
 ## Summary
 
 | Metric | Value |

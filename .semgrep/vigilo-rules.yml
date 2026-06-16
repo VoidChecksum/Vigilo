@@ -1,0 +1,458 @@
+# Vigilo custom Semgrep rules for Solidity smart contracts.
+#
+# These rules target common, high-signal vulnerability classes that Vigilo's
+# CI can run as a fast first pass before the full agent-driven audit.
+#
+# NOTE: Semgrep's Solidity support is experimental and its taint/dataflow
+# engine is far less mature for Solidity than for languages like Python or JS.
+# To stay useful and low-noise we lean on structural patterns and conservative
+# `pattern-not` guards rather than full taint tracking. Treat findings as leads
+# for the specialist auditors (reentrancy, oracle, access-control, ...), not as
+# confirmed vulnerabilities.
+#
+# Usage:
+#   semgrep --config .semgrep/vigilo-rules.yml path/to/contracts
+rules:
+  # ---------------------------------------------------------------------------
+  - id: reentrancy-external-call-before-state
+    languages: [solidity]
+    severity: ERROR
+    message: >-
+      Potential reentrancy: an external low-level call (.call/.send/.transfer)
+      appears before a state update in the same function. This violates the
+      Checks-Effects-Interactions pattern and can allow a malicious callee to
+      re-enter before storage reflects the interaction. Update state before the
+      external call, or guard the function with a nonReentrant modifier.
+    patterns:
+      - pattern-either:
+          # Plain and compound (-=/+=) state updates after an external call. The
+          # canonical vulnerable withdraw decrements a balance with `-=`, so the
+          # compound variants are essential — a plain `=`-only pattern misses it.
+          - pattern: |
+              $ADDR.call{value: $V}($DATA);
+              ...
+              $STATE = $X;
+          - pattern: |
+              $ADDR.call{value: $V}($DATA);
+              ...
+              $STATE -= $X;
+          - pattern: |
+              $ADDR.call{value: $V}($DATA);
+              ...
+              $STATE += $X;
+          - pattern: |
+              (bool $OK) = $ADDR.call{value: $V}($DATA);
+              ...
+              $STATE = $X;
+          - pattern: |
+              (bool $OK) = $ADDR.call{value: $V}($DATA);
+              ...
+              $STATE -= $X;
+          - pattern: |
+              (bool $OK) = $ADDR.call{value: $V}($DATA);
+              ...
+              $STATE += $X;
+          - pattern: |
+              $ADDR.transfer($V);
+              ...
+              $STATE = $X;
+          - pattern: |
+              $ADDR.transfer($V);
+              ...
+              $STATE -= $X;
+          - pattern: |
+              $ADDR.transfer($V);
+              ...
+              $STATE += $X;
+          - pattern: |
+              $ADDR.send($V);
+              ...
+              $STATE = $X;
+          - pattern: |
+              $ADDR.send($V);
+              ...
+              $STATE -= $X;
+          - pattern: |
+              $ADDR.send($V);
+              ...
+              $STATE += $X;
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe:
+        - "CWE-841: Improper Enforcement of Behavioral Workflow"
+      impact: HIGH
+      owasp:
+        - "SC05:2023 Reentrancy Attacks"
+      references:
+        - https://scs.owasp.org/SCSVS/V5-Reentrancy/
+        - https://consensys.github.io/smart-contract-best-practices/attacks/reentrancy/
+      vigilo-auditor: reentrancy
+
+  # ---------------------------------------------------------------------------
+  - id: unchecked-transfer-return
+    languages: [solidity]
+    severity: ERROR
+    message: >-
+      ERC20 transfer/transferFrom return value is ignored. Non-compliant tokens
+      (e.g. some USDT-style implementations) return false instead of reverting
+      on failure, so an unchecked call can silently lose funds. Use
+      SafeERC20.safeTransfer/safeTransferFrom or require() the boolean result.
+    patterns:
+      - pattern-either:
+          - pattern: $TOKEN.transfer($TO, $AMT);
+          - pattern: $TOKEN.transferFrom($FROM, $TO, $AMT);
+      - pattern-not: $RET = $TOKEN.transfer($TO, $AMT);
+      - pattern-not: $RET = $TOKEN.transferFrom($FROM, $TO, $AMT);
+      - pattern-not: require($TOKEN.transfer($TO, $AMT), ...);
+      - pattern-not: require($TOKEN.transferFrom($FROM, $TO, $AMT), ...);
+      - pattern-not: $TOKEN.safeTransfer($TO, $AMT);
+      - pattern-not: $TOKEN.safeTransferFrom($FROM, $TO, $AMT);
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe:
+        - "CWE-252: Unchecked Return Value"
+      impact: HIGH
+      owasp:
+        - "SC05:2023 Unchecked External Calls"
+      references:
+        - https://github.com/crytic/slither/wiki/Detector-Documentation#unchecked-transfer
+      vigilo-auditor: token
+
+  # ---------------------------------------------------------------------------
+  - id: tx-origin-authentication
+    languages: [solidity]
+    severity: ERROR
+    message: >-
+      Authentication based on tx.origin is unsafe. tx.origin is the original
+      EOA that started the transaction, so an intermediary contract the user is
+      tricked into calling can pass this check (phishing). Use msg.sender for
+      access control instead.
+    patterns:
+      # Match the tx.origin comparison itself (not the whole require/if), so it is
+      # also caught inside compound `&&`/`||` conditions, e.g.
+      # `require(tx.origin == owner && msg.sender == owner, ...)`.
+      - pattern-either:
+          - pattern: tx.origin == $X
+          - pattern: $X == tx.origin
+          - pattern: tx.origin != $X
+          - pattern: $X != tx.origin
+      # Do NOT flag the legitimate anti-phishing "caller must be an EOA" idiom.
+      - pattern-not: tx.origin == msg.sender
+      - pattern-not: msg.sender == tx.origin
+      - pattern-not: tx.origin != msg.sender
+      - pattern-not: msg.sender != tx.origin
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe:
+        - "CWE-477: Use of Obsolete Function"
+        - "CWE-284: Improper Access Control"
+      impact: HIGH
+      owasp:
+        - "SC01:2023 Access Control Vulnerabilities"
+      references:
+        - https://swcregistry.io/docs/SWC-115/
+      vigilo-auditor: access-control
+
+  # ---------------------------------------------------------------------------
+  - id: unprotected-selfdestruct
+    languages: [solidity]
+    severity: ERROR
+    message: >-
+      selfdestruct is reachable without an apparent access-control guard. An
+      unprotected self-destruct lets anyone destroy the contract and sweep its
+      balance. Restrict it with onlyOwner/role checks, or remove it entirely
+      (selfdestruct is deprecated post-EIP-6780).
+    patterns:
+      - pattern-either:
+          - pattern: selfdestruct($X);
+          - pattern: suicide($X);
+      - pattern-not-inside: |
+          require($COND, ...);
+          ...
+          selfdestruct($X);
+      # Only suppress when guarded by a recognized ACCESS-CONTROL modifier — not any
+      # modifier (e.g. `whenNotPaused`/`nonReentrant` do not gate who may call it).
+      - pattern-not-inside:
+          patterns:
+            - pattern: function $F(...) $MOD { ... }
+            - metavariable-regex:
+                metavariable: $MOD
+                regex: (?i)(only|auth|restrict|admin|owner|governance|gov|guard|priv|role)
+    metadata:
+      category: security
+      confidence: LOW
+      cwe:
+        - "CWE-284: Improper Access Control"
+      impact: HIGH
+      owasp:
+        - "SC01:2023 Access Control Vulnerabilities"
+      references:
+        - https://swcregistry.io/docs/SWC-106/
+      vigilo-auditor: access-control
+
+  # ---------------------------------------------------------------------------
+  - id: arbitrary-delegatecall
+    languages: [solidity]
+    severity: ERROR
+    message: >-
+      delegatecall target is derived from a function parameter (user-controlled
+      input). delegatecall executes foreign code in this contract's storage
+      context; an attacker-chosen target can overwrite arbitrary storage
+      (including owner/proxy slots) and drain the contract. Restrict the target
+      to a vetted allowlist of implementations.
+    patterns:
+      - pattern: $ADDR.delegatecall($DATA)
+      - pattern-inside: |
+          function $F(..., address $ADDR, ...) { ... }
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe:
+        - "CWE-829: Inclusion of Functionality from Untrusted Control Sphere"
+      impact: HIGH
+      owasp:
+        - "SC05:2023 Unchecked External Calls"
+      references:
+        - https://swcregistry.io/docs/SWC-112/
+      vigilo-auditor: access-control
+
+  # ---------------------------------------------------------------------------
+  - id: block-timestamp-manipulation
+    languages: [solidity]
+    severity: WARNING
+    message: >-
+      block.timestamp (alias now) is used in conditional/time-sensitive logic.
+      Validators can nudge the timestamp by a few seconds, so it is unsafe as a
+      source of randomness or for tight deadlines. Use block.number-based
+      windows or tolerate the ~15s drift; never use it for randomness.
+    # NOTE: Semgrep's Solidity grammar does not accept an operator metavariable
+    # (e.g. `block.timestamp $OP $X`) -- it raises a parse error and disables the
+    # whole rule. We therefore enumerate the comparison operators explicitly.
+    patterns:
+      - pattern-either:
+          - pattern: "if (block.timestamp < $X) { ... }"
+          - pattern: "if (block.timestamp <= $X) { ... }"
+          - pattern: "if (block.timestamp > $X) { ... }"
+          - pattern: "if (block.timestamp >= $X) { ... }"
+          - pattern: "if (block.timestamp == $X) { ... }"
+          - pattern: "if (block.timestamp != $X) { ... }"
+          - pattern: "if ($X < block.timestamp) { ... }"
+          - pattern: "if ($X <= block.timestamp) { ... }"
+          - pattern: "if ($X > block.timestamp) { ... }"
+          - pattern: "if ($X >= block.timestamp) { ... }"
+          - pattern: "if ($X == block.timestamp) { ... }"
+          - pattern: "if ($X != block.timestamp) { ... }"
+          - pattern: "require(block.timestamp < $X, ...);"
+          - pattern: "require(block.timestamp <= $X, ...);"
+          - pattern: "require(block.timestamp > $X, ...);"
+          - pattern: "require(block.timestamp >= $X, ...);"
+          - pattern: "require(block.timestamp == $X, ...);"
+          - pattern: "require(block.timestamp != $X, ...);"
+          - pattern: "require($X < block.timestamp, ...);"
+          - pattern: "require($X <= block.timestamp, ...);"
+          - pattern: "require($X > block.timestamp, ...);"
+          - pattern: "require($X >= block.timestamp, ...);"
+          - pattern: "require($X == block.timestamp, ...);"
+          - pattern: "require($X != block.timestamp, ...);"
+          - pattern: "if (now < $X) { ... }"
+          - pattern: "if (now <= $X) { ... }"
+          - pattern: "if (now > $X) { ... }"
+          - pattern: "if (now >= $X) { ... }"
+          - pattern: "if (now == $X) { ... }"
+          - pattern: "if (now != $X) { ... }"
+          - pattern: "require(now < $X, ...);"
+          - pattern: "require(now <= $X, ...);"
+          - pattern: "require(now > $X, ...);"
+          - pattern: "require(now >= $X, ...);"
+          - pattern: "require(now == $X, ...);"
+          - pattern: "require(now != $X, ...);"
+    metadata:
+      category: security
+      confidence: LOW
+      cwe:
+        - "CWE-829: Inclusion of Functionality from Untrusted Control Sphere"
+        - "CWE-330: Use of Insufficiently Random Values"
+      impact: MEDIUM
+      owasp:
+        - "SC06:2023 Unencrypted Private Data On-Chain"
+      references:
+        - https://swcregistry.io/docs/SWC-116/
+      vigilo-auditor: logic
+
+  # ---------------------------------------------------------------------------
+  - id: uninitialized-storage-pointer
+    languages: [solidity]
+    severity: ERROR
+    message: >-
+      A local variable of struct/array type is declared with the `storage`
+      data location but not initialized to a specific state variable. In legacy
+      Solidity (<0.5.0) such a pointer defaults to slot 0 and writing through it
+      corrupts unrelated storage. Initialize it explicitly or use `memory`.
+    patterns:
+      - pattern-either:
+          - pattern: $T storage $PTR;
+          - pattern: $T[] storage $PTR;
+    metadata:
+      category: security
+      confidence: LOW
+      cwe:
+        - "CWE-824: Access of Uninitialized Pointer"
+      impact: HIGH
+      owasp:
+        - "SC09:2023 Insecure Randomness"
+      references:
+        - https://swcregistry.io/docs/SWC-109/
+      vigilo-auditor: logic
+
+  # ---------------------------------------------------------------------------
+  - id: missing-zero-address-check
+    languages: [solidity]
+    severity: WARNING
+    message: >-
+      An address parameter is assigned to a state variable without a
+      zero-address (address(0)) guard. Setting a critical address (owner, token,
+      oracle, recipient) to the zero address can permanently brick functionality
+      or burn funds. Add `require($PARAM != address(0), ...)` before assigning.
+    # NOTE: a bare visibility metavariable (`function $F(...) $VIS { ... }`) does
+    # not bind in Semgrep's Solidity grammar, so it silently matches nothing.
+    # We omit it; the signature pattern matches regardless of visibility.
+    patterns:
+      - pattern: |
+          function $F(..., address $PARAM, ...) {
+            ...
+            $STATE = $PARAM;
+            ...
+          }
+      - pattern-not: |
+          function $F(..., address $PARAM, ...) {
+            ...
+            require($PARAM != address(0), ...);
+            ...
+          }
+      - pattern-not: |
+          function $F(..., address $PARAM, ...) {
+            ...
+            if ($PARAM == address(0)) { ... }
+            ...
+          }
+      # Don't flag setters whose param is guarded by a zero-check MODIFIER
+      # (a common, correct pattern the inline guards above miss).
+      - pattern-not: |
+          function $F(..., address $PARAM, ...) nonZero($PARAM) { ... }
+      - pattern-not: |
+          function $F(..., address $PARAM, ...) validAddress($PARAM) { ... }
+      - pattern-not: |
+          function $F(..., address $PARAM, ...) notZero($PARAM) { ... }
+      - pattern-not: |
+          function $F(..., address $PARAM, ...) nonZeroAddress($PARAM) { ... }
+    metadata:
+      category: security
+      confidence: LOW
+      cwe:
+        - "CWE-20: Improper Input Validation"
+      impact: MEDIUM
+      owasp:
+        - "SC02:2023 Logic Errors"
+      references:
+        - https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
+      vigilo-auditor: logic
+
+  # ---------------------------------------------------------------------------
+  - id: unsafe-erc20-approve
+    languages: [solidity]
+    severity: WARNING
+    message: >-
+      ERC20 approve is called with a non-zero amount without first resetting the
+      allowance to zero. Tokens that follow the original ERC20 spec are exposed
+      to the approve race/front-running issue (SWC-114). Use
+      SafeERC20.forceApprove / safeIncreaseAllowance, or set the allowance to 0
+      before setting the new value.
+    patterns:
+      - pattern: $TOKEN.approve($SPENDER, $AMT);
+      - pattern-not: $TOKEN.approve($SPENDER, 0);
+      - pattern-not: |
+          $TOKEN.approve($SPENDER, 0);
+          ...
+          $TOKEN.approve($SPENDER, $AMT);
+      - pattern-not: $TOKEN.safeApprove($SPENDER, $AMT);
+      - pattern-not: $TOKEN.forceApprove($SPENDER, $AMT);
+      - pattern-not: $TOKEN.safeIncreaseAllowance($SPENDER, $AMT);
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe:
+        - "CWE-362: Concurrent Execution using Shared Resource ('Race Condition')"
+      impact: MEDIUM
+      owasp:
+        - "SC02:2023 Logic Errors"
+      references:
+        - https://swcregistry.io/docs/SWC-114/
+      vigilo-auditor: token
+
+  # ---------------------------------------------------------------------------
+  - id: hardcoded-gas-amount
+    languages: [solidity]
+    severity: WARNING
+    message: >-
+      A hardcoded gas value is forwarded with a low-level call
+      (.call{gas: N}). Gas costs of opcodes change across hard forks
+      (e.g. EIP-1884, EIP-2929), so a fixed stipend that works today may cause
+      the recipient's fallback to run out of gas after a fork. Forward all
+      remaining gas, or make the stipend configurable/audited.
+    patterns:
+      - pattern-either:
+          - pattern: "$ADDR.call{gas: $G}($DATA)"
+          - pattern: "$ADDR.call{value: $V, gas: $G}($DATA)"
+          - pattern: "$ADDR.call{gas: $G, value: $V}($DATA)"
+          - pattern: "$ADDR.staticcall{gas: $G}($DATA)"
+          - pattern: "$ADDR.delegatecall{gas: $G}($DATA)"
+      - metavariable-pattern:
+          metavariable: $G
+          patterns:
+            - pattern-not: gasleft()
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe:
+        - "CWE-400: Uncontrolled Resource Consumption"
+      impact: MEDIUM
+      owasp:
+        - "SC08:2023 Denial Of Service Attacks"
+      references:
+        - https://eips.ethereum.org/EIPS/eip-1884
+      vigilo-auditor: logic
+
+  # ---------------------------------------------------------------------------
+  - id: unprotected-low-level-call-value
+    languages: [solidity]
+    severity: WARNING
+    message: >-
+      A low-level call forwards ETH (value) using calldata derived from a
+      function parameter. If the target and/or calldata are user-controlled and
+      the function lacks access control, this enables arbitrary external calls
+      from the contract's context (e.g. draining approvals granted to this
+      contract). Constrain the target and add access control.
+    # NOTE: a bare visibility metavariable (`$VIS`) does not bind in Semgrep's
+    # Solidity grammar, so we drop it from the enclosing-function pattern.
+    patterns:
+      - pattern: "$ADDR.call{value: $V}($DATA)"
+      - pattern-inside: |
+          function $F(..., bytes $DATA, ...) { ... }
+      - pattern-not-inside: |
+          function $F(...) onlyOwner { ... }
+      - pattern-not-inside: |
+          function $F(...) $MOD { ... }
+    metadata:
+      category: security
+      confidence: LOW
+      cwe:
+        - "CWE-829: Inclusion of Functionality from Untrusted Control Sphere"
+      impact: HIGH
+      owasp:
+        - "SC05:2023 Unchecked External Calls"
+      references:
+        - https://scs.owasp.org/
+      vigilo-auditor: access-control

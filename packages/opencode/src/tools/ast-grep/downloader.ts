@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, chmodSync, unlinkSync, createWriteStream, statSync } from "node:fs"
+import { verifyAstGrepChecksum } from "./checksums"
 import { join } from "node:path"
 import { homedir } from "node:os"
 import { createRequire } from "node:module"
@@ -97,8 +98,39 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
 
     const archivePath = join(cacheDir, assetName)
     const arrayBuffer = await response.arrayBuffer()
+    const buf = Buffer.from(arrayBuffer)
+
+    // Supply-chain hardening: verify the download against a pinned SHA-256 before we
+    // ever extract + chmod + execute it. Both a mismatch and an unpinned (unknown)
+    // version/platform are fail-closed — an unverified binary is refused by default,
+    // since proceeding anyway would silently defeat the integrity control. An operator
+    // can opt in to an unverified download (e.g. a brand-new release) explicitly.
+    const check = verifyAstGrepChecksum(version, platformKey, buf)
+    if (check.status === "mismatch") {
+      console.error(
+        `[vigilo] ast-grep checksum MISMATCH for ${platformKey}@${version} ` +
+          `(expected ${check.expected}, got ${check.actual}). Refusing to use the download.`
+      )
+      return null
+    }
+    if (check.status === "unknown") {
+      if (process.env.VIGILO_ALLOW_UNVERIFIED_AST_GREP === "1") {
+        console.warn(
+          `[vigilo] ast-grep checksum not pinned for ${platformKey}@${version}; ` +
+            `proceeding unverified (VIGILO_ALLOW_UNVERIFIED_AST_GREP=1).`
+        )
+      } else {
+        console.error(
+          `[vigilo] ast-grep checksum not pinned for ${platformKey}@${version}; refusing to use ` +
+            `an unverified download. Pin its SHA-256 in checksums.ts, or set ` +
+            `VIGILO_ALLOW_UNVERIFIED_AST_GREP=1 to override.`
+        )
+        return null
+      }
+    }
+
     const { writeFileSync } = await import("node:fs")
-    writeFileSync(archivePath, Buffer.from(arrayBuffer))
+    writeFileSync(archivePath, buf)
 
     await extractZip(archivePath, cacheDir)
 

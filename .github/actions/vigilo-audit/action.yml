@@ -1,0 +1,467 @@
+name: "Vigilo Smart Contract Audit"
+description: >
+  Run an autonomous smart contract security audit against Solidity/Vyper/Cairo
+  projects using Vigilo. Emits SARIF v2.1.0 results for GitHub Code Scanning
+  and fails the job when findings hit a configurable severity threshold.
+author: "PurpleAILAB"
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  target:
+    description: "Target directory to audit (relative to the repository root)."
+    required: false
+    default: "./"
+  scan-mode:
+    description: "Audit depth: quick | standard | deep."
+    required: false
+    default: "standard"
+  scope-mode:
+    description: "Audit scope: full (whole target) or diff (changed files only)."
+    required: false
+    default: "full"
+  diff-base:
+    description: "Git ref to diff against when scope-mode is 'diff'."
+    required: false
+    default: "origin/main"
+  fail-on:
+    description: "Minimum severity that fails the job: critical | high | medium | low | none."
+    required: false
+    default: "high"
+  sarif-output:
+    description: "Path for the generated SARIF v2.1.0 file."
+    required: false
+    default: "vigilo.sarif"
+  upload-sarif:
+    description: "Upload the SARIF report to GitHub Code Scanning."
+    required: false
+    default: "true"
+  language:
+    description: "Smart contract language: solidity | vyper | cairo | auto."
+    required: false
+    default: "auto"
+  framework:
+    description: "Build framework: foundry | hardhat | auto."
+    required: false
+    default: "auto"
+  model:
+    description: "LLM model used for analysis (provider/model)."
+    required: false
+    default: "anthropic/claude-sonnet-4-20250514"
+
+outputs:
+  sarif-path:
+    description: "Path to the generated SARIF file."
+    value: ${{ steps.sarif.outputs.sarif-path }}
+  critical-count:
+    description: "Number of critical severity findings."
+    value: ${{ steps.sarif.outputs.critical-count }}
+  finding-count:
+    description: "Total number of findings across all severities."
+    value: ${{ steps.sarif.outputs.finding-count }}
+  high-count:
+    description: "Number of high severity findings."
+    value: ${{ steps.sarif.outputs.high-count }}
+  medium-count:
+    description: "Number of medium severity findings."
+    value: ${{ steps.sarif.outputs.medium-count }}
+  exit-code:
+    description: "0 = ok, 1 = findings >= threshold, 2 = error."
+    value: ${{ steps.sarif.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    # --------------------------------------------------------------------- #
+    # 0. Check out the repository with full history (required for diff mode) #
+    # --------------------------------------------------------------------- #
+    - name: Checkout repository
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      with:
+        fetch-depth: 0
+
+    # --------------------------------------------------------------------- #
+    # 1. Install Node.js and Vigilo                                         #
+    # --------------------------------------------------------------------- #
+    - name: Set up Node.js
+      uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      with:
+        node-version: "24"
+
+    - name: Install Vigilo
+      shell: bash
+      run: |
+        echo "::group::Install Vigilo + OpenCode"
+        npm install -g vigilo opencode-ai
+        vigilo version || true
+        echo "::endgroup::"
+
+    # --------------------------------------------------------------------- #
+    # 2. Detect framework and install contract dependencies                #
+    # --------------------------------------------------------------------- #
+    - name: Detect framework and install dependencies
+      id: detect
+      shell: bash
+      working-directory: ${{ inputs.target }}
+      env:
+        VIGILO_FRAMEWORK: ${{ inputs.framework }}
+      run: |
+        set -euo pipefail
+        echo "::group::Detect build framework"
+
+        framework="$VIGILO_FRAMEWORK"
+        if [ "$framework" = "auto" ]; then
+          if [ -f "foundry.toml" ]; then
+            framework="foundry"
+          elif [ -f "hardhat.config.js" ] || [ -f "hardhat.config.ts" ]; then
+            framework="hardhat"
+          else
+            framework="none"
+          fi
+        fi
+        echo "Detected framework: $framework"
+        echo "framework=$framework" >> "$GITHUB_OUTPUT"
+
+        case "$framework" in
+          foundry)
+            echo "Installing Foundry toolchain..."
+            curl -L https://foundry.paradigm.xyz | bash
+            # shellcheck disable=SC1090
+            export PATH="$HOME/.foundry/bin:$PATH"
+            echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
+            foundryup
+            if [ -f ".gitmodules" ]; then
+              git submodule update --init --recursive || forge install || true
+            fi
+            ;;
+          hardhat)
+            echo "Installing Node dependencies..."
+            if [ -f "package-lock.json" ]; then
+              npm ci
+            else
+              npm install
+            fi
+            ;;
+          *)
+            echo "No recognized build framework; skipping dependency install."
+            ;;
+        esac
+        echo "::endgroup::"
+
+    # --------------------------------------------------------------------- #
+    # 3. Build contracts                                                    #
+    # --------------------------------------------------------------------- #
+    - name: Build contracts
+      shell: bash
+      working-directory: ${{ inputs.target }}
+      env:
+        VIGILO_FRAMEWORK: ${{ steps.detect.outputs.framework }}
+      run: |
+        set -euo pipefail
+        echo "::group::Build contracts"
+        export PATH="$HOME/.foundry/bin:$PATH"
+        case "$VIGILO_FRAMEWORK" in
+          foundry)
+            forge build --build-info || echo "::warning::forge build reported errors; continuing with audit."
+            ;;
+          hardhat)
+            npx hardhat compile || echo "::warning::hardhat compile reported errors; continuing with audit."
+            ;;
+          *)
+            echo "No build step for framework: $VIGILO_FRAMEWORK"
+            ;;
+        esac
+        echo "::endgroup::"
+
+    # --------------------------------------------------------------------- #
+    # 4. Run the Vigilo audit                                               #
+    # --------------------------------------------------------------------- #
+    - name: Run Vigilo audit
+      id: audit
+      shell: bash
+      working-directory: ${{ inputs.target }}
+      env:
+        VIGILO_SCAN_MODE: ${{ inputs.scan-mode }}
+        VIGILO_SCOPE_MODE: ${{ inputs.scope-mode }}
+        VIGILO_DIFF_BASE: ${{ inputs.diff-base }}
+        VIGILO_LANGUAGE: ${{ inputs.language }}
+        VIGILO_MODEL: ${{ inputs.model }}
+      run: |
+        set -uo pipefail
+        echo "::group::Run Vigilo audit"
+        export PATH="$HOME/.foundry/bin:$PATH"
+
+        # Register the Vigilo plugin (non-interactive).
+        vigilo install --no-tui --skip-auth --foundry=yes || true
+
+        # Resolve scope. In diff mode, restrict the audit to changed contracts.
+        SCOPE_ARGS=""
+        if [ "$VIGILO_SCOPE_MODE" = "diff" ]; then
+          echo "Computing diff scope against $VIGILO_DIFF_BASE..."
+          git fetch --no-tags --quiet origin "${VIGILO_DIFF_BASE#origin/}" || true
+          CHANGED=$(git diff --name-only "$VIGILO_DIFF_BASE"...HEAD -- '*.sol' '*.vy' '*.cairo' 2>/dev/null || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No changed contract files detected; nothing to audit."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "Changed contracts:"
+          echo "$CHANGED"
+          SCOPE_ARGS="--scope $(echo "$CHANGED" | paste -sd, -)"
+        fi
+        echo "skipped=false" >> "$GITHUB_OUTPUT"
+
+        # Drive the audit headlessly through OpenCode. Findings are written to
+        # .vigilo/findings/<severity>/*.md by the Vigilo legion.
+        AUDIT_PROMPT="/audit . --mode ${VIGILO_SCAN_MODE} --language ${VIGILO_LANGUAGE} ${SCOPE_ARGS}"
+        echo "Audit prompt: ${AUDIT_PROMPT}"
+        opencode run "${AUDIT_PROMPT}" --model "${VIGILO_MODEL}" \
+          || echo "::warning::Vigilo audit exited non-zero; SARIF will be generated from any findings produced."
+        echo "::endgroup::"
+
+    # --------------------------------------------------------------------- #
+    # 5. Parse findings and generate SARIF v2.1.0                           #
+    # --------------------------------------------------------------------- #
+    - name: Generate SARIF report
+      id: sarif
+      if: always()
+      shell: bash
+      env:
+        VIGILO_TARGET: ${{ inputs.target }}
+        VIGILO_SARIF_OUTPUT: ${{ inputs.sarif-output }}
+        VIGILO_FAIL_ON: ${{ inputs.fail-on }}
+        VIGILO_AUDIT_SKIPPED: ${{ steps.audit.outputs.skipped }}
+      run: |
+        set -uo pipefail
+        echo "::group::Generate SARIF report"
+
+        cat > "${RUNNER_TEMP}/vigilo-sarif.mjs" <<'SARIF_EOF'
+        import fs from "node:fs";
+        import path from "node:path";
+
+        const target = process.env.VIGILO_TARGET || "./";
+        const sarifOutput = process.env.VIGILO_SARIF_OUTPUT || "vigilo.sarif";
+        const failOn = (process.env.VIGILO_FAIL_ON || "high").toLowerCase();
+        const ghOutput = process.env.GITHUB_OUTPUT;
+
+        const findingsDir = path.join(target, ".vigilo", "findings");
+
+        const RANK = { none: 0, info: 1, informational: 1, gas: 1, low: 1, medium: 2, high: 3, critical: 4 };
+        const LEVEL = { critical: "error", high: "error", medium: "warning", low: "note", info: "note", informational: "note", gas: "note" };
+
+        function walk(dir) {
+          const out = [];
+          let entries = [];
+          try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+          } catch {
+            return out;
+          }
+          for (const e of entries) {
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) out.push(...walk(full));
+            else if (e.isFile() && e.name.toLowerCase().endsWith(".md")) out.push(full);
+          }
+          return out;
+        }
+
+        function severityFromText(text, file) {
+          const meta = text.match(/\*\*Severity\*\*\s*\|\s*[^A-Za-z]*\s*(critical|high|medium|low|informational|info|gas)/i);
+          if (meta) return meta[1].toLowerCase();
+          const dir = path.basename(path.dirname(file)).toLowerCase();
+          if (RANK[dir] !== undefined) return dir;
+          const prefix = path.basename(file).match(/^([CHMLQ])-?\d/i);
+          if (prefix) {
+            const map = { c: "critical", h: "high", m: "medium", l: "low", q: "info" };
+            return map[prefix[1].toLowerCase()] || "info";
+          }
+          return "info";
+        }
+
+        function titleFromText(text, file) {
+          const h1 = text.match(/^#\s+(.+)$/m);
+          if (h1) return h1[1].replace(/^\[[^\]]+\]\s*/, "").trim();
+          return path.basename(file, ".md");
+        }
+
+        function locationFromText(text) {
+          const loc = text.match(/Location:\s*([\w./\\-]+\.(?:sol|vy|cairo))(?::(\d+)(?:-(\d+))?)?/i);
+          if (loc) return { file: loc[1].replace(/\\/g, "/"), line: loc[2] ? parseInt(loc[2], 10) : 1 };
+          const any = text.match(/([\w./\\-]+\.(?:sol|vy|cairo))(?::(\d+))?/);
+          if (any) return { file: any[1].replace(/\\/g, "/"), line: any[2] ? parseInt(any[2], 10) : 1 };
+          return { file: path.join(target, "unknown").replace(/\\/g, "/"), line: 1 };
+        }
+
+        function kebab(s) {
+          return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64) || "finding";
+        }
+
+        const files = walk(findingsDir);
+        const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+        const rules = new Map();
+        const results = [];
+        let maxRank = 0;
+
+        for (const file of files) {
+          const text = fs.readFileSync(file, "utf8");
+          const severity = severityFromText(text, file);
+          const bucket = severity === "informational" || severity === "gas" ? "info" : severity;
+          if (counts[bucket] === undefined) counts[bucket] = 0;
+          counts[bucket]++;
+          maxRank = Math.max(maxRank, RANK[severity] ?? 1);
+
+          const title = titleFromText(text, file);
+          const loc = locationFromText(text);
+          const idMatch = path.basename(file).match(/^([CHMLQ]-?\d+)/i);
+          const ruleId = (idMatch ? idMatch[1].toUpperCase().replace("-", "-") : kebab(title));
+
+          if (!rules.has(ruleId)) {
+            rules.set(ruleId, {
+              id: ruleId,
+              name: kebab(title),
+              shortDescription: { text: title },
+              defaultConfiguration: { level: LEVEL[severity] || "note" },
+              properties: { tags: ["security", "smart-contract"], "security-severity": String(severity === "critical" ? 9.5 : severity === "high" ? 8.0 : severity === "medium" ? 5.0 : 2.0) },
+            });
+          }
+
+          results.push({
+            ruleId,
+            level: LEVEL[severity] || "note",
+            message: { text: title },
+            locations: [
+              {
+                physicalLocation: {
+                  artifactLocation: { uri: loc.file },
+                  region: { startLine: loc.line },
+                },
+              },
+            ],
+          });
+        }
+
+        const sarif = {
+          $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+          version: "2.1.0",
+          runs: [
+            {
+              tool: {
+                driver: {
+                  name: "Vigilo",
+                  informationUri: "https://github.com/PurpleAILAB/Vigilo",
+                  rules: [...rules.values()],
+                },
+              },
+              results,
+            },
+          ],
+        };
+
+        fs.mkdirSync(path.dirname(path.resolve(sarifOutput)), { recursive: true });
+        fs.writeFileSync(sarifOutput, JSON.stringify(sarif, null, 2));
+
+        const total = results.length;
+        const failRank = RANK[failOn] ?? 3;
+        let exitCode = 0;
+        if (failOn !== "none" && maxRank >= failRank && failRank > 0) exitCode = 1;
+
+        const lines = [
+          `sarif-path=${sarifOutput}`,
+          `finding-count=${total}`,
+          `critical-count=${counts.critical || 0}`,
+          `high-count=${counts.high || 0}`,
+          `medium-count=${counts.medium || 0}`,
+          `low-count=${counts.low || 0}`,
+          `info-count=${counts.info || 0}`,
+          `exit-code=${exitCode}`,
+        ];
+        if (ghOutput) fs.appendFileSync(ghOutput, lines.join("\n") + "\n");
+
+        console.log(`Vigilo findings: ${total} total ` +
+          `(critical=${counts.critical || 0}, high=${counts.high || 0}, medium=${counts.medium || 0}, low=${counts.low || 0}, info=${counts.info || 0})`);
+        console.log(`SARIF written to ${sarifOutput}`);
+        console.log(`fail-on=${failOn} -> exit-code=${exitCode}`);
+        SARIF_EOF
+
+        if ! node "${RUNNER_TEMP}/vigilo-sarif.mjs"; then
+          echo "::error::Failed to generate SARIF report."
+          echo "sarif-path=${VIGILO_SARIF_OUTPUT}" >> "$GITHUB_OUTPUT"
+          echo "finding-count=0" >> "$GITHUB_OUTPUT"
+          echo "critical-count=0" >> "$GITHUB_OUTPUT"
+          echo "high-count=0" >> "$GITHUB_OUTPUT"
+          echo "medium-count=0" >> "$GITHUB_OUTPUT"
+          echo "low-count=0" >> "$GITHUB_OUTPUT"
+          echo "info-count=0" >> "$GITHUB_OUTPUT"
+          echo "exit-code=2" >> "$GITHUB_OUTPUT"
+        fi
+        echo "::endgroup::"
+
+    # --------------------------------------------------------------------- #
+    # 6. Upload SARIF to GitHub Code Scanning                               #
+    # --------------------------------------------------------------------- #
+    - name: Upload SARIF to GitHub Code Scanning
+      if: ${{ always() && inputs.upload-sarif == 'true' && hashFiles(inputs.sarif-output) != '' }}
+      uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3.36.2
+      with:
+        sarif_file: ${{ inputs.sarif-output }}
+        category: vigilo
+
+    # --------------------------------------------------------------------- #
+    # 7. Enforce the severity threshold                                     #
+    # --------------------------------------------------------------------- #
+    - name: Enforce severity threshold
+      if: always()
+      shell: bash
+      env:
+        VIGILO_EXIT_CODE: ${{ steps.sarif.outputs.exit-code }}
+        VIGILO_FAIL_ON: ${{ inputs.fail-on }}
+        VIGILO_FINDINGS: ${{ steps.sarif.outputs.finding-count }}
+        VIGILO_CRITICAL: ${{ steps.sarif.outputs.critical-count }}
+        VIGILO_HIGH: ${{ steps.sarif.outputs.high-count }}
+        VIGILO_MEDIUM: ${{ steps.sarif.outputs.medium-count }}
+        VIGILO_LOW: ${{ steps.sarif.outputs.low-count }}
+        VIGILO_INFO: ${{ steps.sarif.outputs.info-count }}
+      run: |
+        set -uo pipefail
+        echo "Vigilo audit summary:"
+        echo "  Total findings : ${VIGILO_FINDINGS:-0}"
+        echo "  Critical       : ${VIGILO_CRITICAL:-0}"
+        echo "  High           : ${VIGILO_HIGH:-0}"
+        echo "  Medium         : ${VIGILO_MEDIUM:-0}"
+        echo "  fail-on        : ${VIGILO_FAIL_ON}"
+
+        # In-PR / run observability: render a summary table to the job summary.
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          {
+            echo "## 🛡️ Vigilo Smart Contract Audit"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|----------|-------|"
+            echo "| Critical | ${VIGILO_CRITICAL:-0} |"
+            echo "| High | ${VIGILO_HIGH:-0} |"
+            echo "| Medium | ${VIGILO_MEDIUM:-0} |"
+            echo "| Low | ${VIGILO_LOW:-0} |"
+            echo "| Informational | ${VIGILO_INFO:-0} |"
+            echo "| **Total** | **${VIGILO_FINDINGS:-0}** |"
+            echo ""
+            echo "**Gate:** \`fail-on = ${VIGILO_FAIL_ON}\` → $([ "${VIGILO_EXIT_CODE:-2}" = "0" ] && echo "✅ passed" || echo "❌ failed")"
+            echo ""
+            echo "Detailed findings are in the **Code Scanning** tab (SARIF), and under \`.vigilo/findings/\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        case "${VIGILO_EXIT_CODE:-2}" in
+          0)
+            echo "✅ No findings at or above the '${VIGILO_FAIL_ON}' threshold."
+            ;;
+          1)
+            echo "::error::Vigilo found issues at or above the '${VIGILO_FAIL_ON}' severity threshold."
+            exit 1
+            ;;
+          *)
+            echo "::error::Vigilo audit failed to complete (error exit code)."
+            exit 1
+            ;;
+        esac

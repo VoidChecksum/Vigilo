@@ -416,3 +416,58 @@ describe("ConcurrencyManager.cleanup", () => {
     await p
   })
 })
+
+describe("ConcurrencyManager global cap (maxConcurrentTasks)", () => {
+  test("#given cap 2 across DIFFERENT models #then 3rd acquire queues until a release", async () => {
+    const m = new ConcurrencyManager({ maxConcurrentTasks: 2 })
+    await m.acquire("model-a")
+    await m.acquire("model-b")
+    expect(m.getGlobalCount()).toBe(2)
+
+    let third = false
+    const p = m.acquire("model-c").then(() => { third = true })
+    await Promise.resolve()
+    expect(third).toBe(false) // blocked by global cap even though model-c is idle
+
+    m.release("model-a")
+    await p
+    expect(third).toBe(true)
+  })
+
+  test("#given cap disabled (0) #then unlimited across keys", async () => {
+    const m = new ConcurrencyManager({ maxConcurrentTasks: 0 })
+    await m.acquire("a"); await m.acquire("b"); await m.acquire("c"); await m.acquire("d")
+    expect(m.getGlobalCount()).toBe(0) // disabled ⇒ not tracked
+  })
+
+  test("#given default config #then cap is disabled (no behavior change)", () => {
+    expect(new ConcurrencyManager().getGlobalLimit()).toBe(Infinity)
+    expect(new ConcurrencyManager({ defaultConcurrency: 3 }).getGlobalLimit()).toBe(Infinity)
+  })
+
+  test("#given a global waiter #then clear() rejects it (no leak)", async () => {
+    const m = new ConcurrencyManager({ maxConcurrentTasks: 1 })
+    await m.acquire("a")
+    let rejected = false
+    const p = m.acquire("b").catch(() => { rejected = true })
+    await Promise.resolve()
+    m.clear()
+    await p
+    expect(rejected).toBe(true)
+    expect(m.getGlobalCount()).toBe(0)
+  })
+
+  test("#given global+per-key both capped #then no deadlock, runs as slots free", async () => {
+    const m = new ConcurrencyManager({ maxConcurrentTasks: 2, defaultConcurrency: 1 })
+    const order: string[] = []
+    await m.acquire("a"); order.push("a")
+    const pb = m.acquire("b").then(() => order.push("b")) // global slot 2/2, key b ok
+    await pb
+    const pc = m.acquire("c").then(() => order.push("c")) // blocked: global full
+    await Promise.resolve()
+    expect(order).toEqual(["a", "b"])
+    m.release("a")
+    await pc
+    expect(order).toEqual(["a", "b", "c"])
+  })
+})

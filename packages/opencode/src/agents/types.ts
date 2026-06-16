@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 
 export type AuditorFactory = (model: string) => AgentConfig
 
-export type AuditorCategory = "recon" | "specialist" | "utility" | "orchestration" | "exploitation" | "post-exploitation"
+export type AuditorCategory = "recon" | "specialist" | "utility" | "orchestration"
 
 export type AuditorCost = "FAST" | "DEEP" | "EXPENSIVE"
 
@@ -65,44 +65,6 @@ export const MIN_CONFIDENCE_FOR_SEVERITY: Record<"Critical" | "High" | "Medium" 
 }
 
 // =============================================================================
-// MODEL TIERS (Decepticon-Style)
-// =============================================================================
-
-export type ModelTier = "HIGH" | "MID" | "LOW"
-
-export interface ModelProfile {
-  orchestrator: ModelTier
-  exploitation: ModelTier
-  verification: ModelTier
-  analysis: ModelTier
-  recon: ModelTier
-}
-
-export const MODEL_PROFILES: Record<"eco" | "max" | "test", ModelProfile> = {
-  eco: {
-    orchestrator: "HIGH",
-    exploitation: "HIGH",
-    verification: "MID",
-    analysis: "MID",
-    recon: "LOW",
-  },
-  max: {
-    orchestrator: "HIGH",
-    exploitation: "HIGH",
-    verification: "HIGH",
-    analysis: "HIGH",
-    recon: "HIGH",
-  },
-  test: {
-    orchestrator: "LOW",
-    exploitation: "LOW",
-    verification: "LOW",
-    analysis: "LOW",
-    recon: "LOW",
-  },
-}
-
-// =============================================================================
 // SEVERITY & PRIORITY
 // =============================================================================
 
@@ -115,50 +77,6 @@ export interface SeverityAssignment {
   impactScore: number  // 0-100
   remediationEffort: "Trivial" | "Small" | "Medium" | "Large" | "Very Large"
   justification: string
-}
-
-// =============================================================================
-// NETWORK ARCHITECTURE
-// =============================================================================
-
-export type NetworkPlane = "management" | "sandbox"
-
-export interface NetworkConfig {
-  management: {
-    subnet: string
-    gateway: string
-    services: string[]
-  }
-  sandbox: {
-    subnet: string
-    gateway: string
-    isolated: boolean
-    services: string[]
-  }
-}
-
-// =============================================================================
-// SANDBOX MANAGEMENT
-// =============================================================================
-
-export type SandboxMode = "tmux-session" | "container" | "direct"
-export type SandboxStatus = "WAITING" | "READY" | "EXECUTING" | "BUSY" | "COMPLETE" | "STUCK" | "ERROR"
-export type PromptType = "bash" | "msfconsole" | "sliver" | "powershell" | "gdb" | "python" | "mysql" | "generic"
-
-export interface SandboxSession {
-  sessionId: string
-  containerId?: string
-  auditorName: string
-  mode: SandboxMode
-  status: SandboxStatus
-  promptType?: PromptType
-  stdinLog: string
-  stdoutLog: string
-  stderrLog: string
-  timestamp: string
-  error?: string
-  tools: string[]
-  isInteractive: boolean
 }
 
 // =============================================================================
@@ -222,39 +140,6 @@ export interface AttackChain {
   compoundScore: number
   description: string
   visualization: string  // Mermaid or DOT format
-}
-
-// =============================================================================
-// PROVIDER ABSTRACTION
-// =============================================================================
-
-export type ProviderName =
-  | "anthropic"
-  | "openai"
-  | "google"
-  | "mistral"
-  | "xai"
-  | "deepseek"
-  | "minimax"
-  | "nvidia"
-  | "ollama"
-  | "openrouter"
-  | "local"
-
-export interface ProviderConfig {
-  name: ProviderName
-  apiKey: string
-  baseUrl?: string
-  priority: number
-  tier: ModelTier
-  enabled: boolean
-  models: string[]
-}
-
-export interface ModelFallbackChain {
-  primary: ProviderName
-  fallbacks: ProviderName[]
-  tier: ModelTier
 }
 
 export interface AuditorTrigger {

@@ -120,6 +120,51 @@ async function checkSolidityLsp(): Promise<CheckResult> {
   }
 }
 
+async function checkAnalyzers(): Promise<CheckResult> {
+  // Optional-but-recommended external analyzers the validator phase drives via the
+  // slither/mythril/halmos/echidna tools. Each tool degrades to a runtime install
+  // hint when its binary is absent, so a missing analyzer is a warning, not a failure.
+  const binaries = [
+    { bin: "slither", hint: "pipx install slither-analyzer" },
+    { bin: "myth", hint: "pipx install mythril" },
+    { bin: "halmos", hint: "pipx install halmos" },
+    { bin: "echidna", hint: "https://github.com/crytic/echidna#installation" },
+  ]
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+
+  const present: string[] = []
+  const missing: typeof binaries = []
+  for (const entry of binaries) {
+    try {
+      const proc = Bun.spawn([whichCmd, entry.bin], { stdout: "pipe", stderr: "pipe" })
+      await proc.exited
+      if (proc.exitCode === 0) present.push(entry.bin)
+      else missing.push(entry)
+    } catch {
+      missing.push(entry)
+    }
+  }
+
+  if (missing.length === 0) {
+    return {
+      id: "analyzers",
+      name: "Analyzers (Slither/Mythril/Halmos/Echidna)",
+      status: "pass",
+      message: "all analyzers available",
+    }
+  }
+
+  return {
+    id: "analyzers",
+    name: "Analyzers (Slither/Mythril/Halmos/Echidna)",
+    status: "warn",
+    message:
+      `missing (optional): ${missing.map((m) => m.bin).join(", ")}` +
+      (present.length ? ` — found: ${present.join(", ")}` : ""),
+    details: missing.map((m) => `Install ${m.bin}: ${m.hint}`),
+  }
+}
+
 function printResult(result: CheckResult, verbose: boolean): void {
   const symbol = SYMBOLS[result.status]
   const statusColor = result.status === "pass" ? color.green :
@@ -157,6 +202,7 @@ export async function doctor(options: DoctorOptions): Promise<number> {
     { id: "installation", fn: checkVigiloPlugin },
     { id: "foundry", fn: checkFoundry },
     { id: "tools", fn: checkSolidityLsp },
+    { id: "tools", fn: checkAnalyzers },
   ]
 
   for (const check of checks) {

@@ -68,9 +68,43 @@ export function log(msg: string): void {
   console.log(`[bench] ${msg}`);
 }
 
+/**
+ * Error raised by {@link error}. Carries an already-logged message so the CLI
+ * entrypoint can exit(1) without double-printing. Throwing (instead of
+ * `process.exit`) keeps the package embeddable as a library and lets tests
+ * exercise error paths without tearing down the whole test runner.
+ */
+export class BenchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BenchError";
+  }
+}
+
 export function error(msg: string): never {
   console.error(`[bench] ERROR: ${msg}`);
-  process.exit(1);
+  throw new BenchError(msg);
+}
+
+export interface RunStability {
+  runs: number;
+  mean: number;
+  stddev: number;
+  min: number;
+  max: number;
+}
+
+/**
+ * Summarize a metric across N scoring runs (population mean/stddev/min/max). The LLM
+ * judge is non-deterministic, so a single "we beat GPT-5 by X%" number is unfalsifiable;
+ * reporting mean ± stddev over `--runs N` makes the claim checkable. Pure/testable.
+ */
+export function summarizeRuns(values: number[]): RunStability {
+  const runs = values.length;
+  if (runs === 0) return { runs: 0, mean: 0, stddev: 0, min: 0, max: 0 };
+  const mean = values.reduce((a, b) => a + b, 0) / runs;
+  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / runs;
+  return { runs, mean, stddev: Math.sqrt(variance), min: Math.min(...values), max: Math.max(...values) };
 }
 
 export interface ScorerConfig {

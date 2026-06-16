@@ -1,0 +1,14 @@
+# yamllint configuration for Vigilo
+# Docs: https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  line-length:
+    max: 120
+    level: warning
+  # GitHub Actions uses `on:`, `yes`/`no` style keys — truthy is too strict.
+  truthy: disable
+  indentation:
+    spaces: 2
+    indent-sequences: true

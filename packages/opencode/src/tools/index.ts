@@ -3,6 +3,27 @@ import type { ToolDefinition } from "@opencode-ai/plugin"
 export { foundryTools, forge_build, forge_test, forge_coverage, cast_call } from "./foundry"
 export type { ForgeBuildArgs, ForgeTestArgs, ForgeCoverageArgs, CastCallArgs } from "./foundry"
 
+export { slither, slitherTools } from "./slither"
+export type { SlitherArgs, SlitherFinding } from "./slither"
+
+export { mythril, mythrilTools } from "./mythril"
+export type { MythrilArgs, MythrilFinding } from "./mythril"
+
+export { halmos, halmosTools } from "./halmos"
+export type { HalmosArgs, HalmosTestResult } from "./halmos"
+
+export { echidna, echidnaTools } from "./echidna"
+export type { EchidnaArgs, EchidnaTestResult } from "./echidna"
+
+export { fetch_contract_source, contractSourceTools } from "./contract-source"
+export type { FetchContractSourceArgs, ParsedContractSource } from "./contract-source"
+
+export { kg_record, kg_query, kg_chain, kgTools, KnowledgeGraphStore } from "./kg"
+export type { KGNode, KGEdge } from "./kg"
+
+export { plan_init, plan_status, plan_complete_phase, plan_record_finding, plan_query, planTools, AuditPlanStore } from "./plan"
+export type { AuditPlan, Phase, PlanFinding } from "./plan"
+
 export { createDelegateTask } from "./delegate-task"
 export type { DelegateTaskToolOptions, DelegateTaskArgs } from "./delegate-task"
 

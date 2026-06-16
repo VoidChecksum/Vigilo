@@ -11,6 +11,10 @@ import type {
   ConfidenceScore,
   Severity,
 } from "../agents/types"
+import {
+  MAX_SEVERITY_FOR_EVIDENCE,
+  MIN_CONFIDENCE_FOR_SEVERITY,
+} from "../agents/types"
 
 // =============================================================================
 // CONSTANTS

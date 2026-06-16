@@ -18,17 +18,29 @@ import {
   resolveModelWithFallback,
   AUDITOR_MODEL_REQUIREMENTS,
   fetchAvailableModels,
+  enforceToolRestrictions,
 } from "../shared"
 
 function mergeAgentConfig(
   base: AgentConfig,
-  override: Partial<AgentConfig> & { prompt_append?: string }
+  override: Partial<AgentConfig> & { prompt_append?: string },
+  agentName?: string
 ): AgentConfig {
   const { prompt_append, ...rest } = override
   const merged = { ...base, ...rest }
 
   if (prompt_append && merged.prompt) {
     merged.prompt = merged.prompt + "\n" + prompt_append
+  }
+
+  // Safety gate: if an override touches `tools`, re-assert any safety-critical
+  // restrictions for this agent so a config can't silently grant read-only recon
+  // agents write/exec/delegate (bypassable via VIGILO_ALLOW_UNSAFE_OVERRIDES=1).
+  if (agentName && "tools" in rest) {
+    merged.tools = enforceToolRestrictions(
+      agentName,
+      merged.tools as Record<string, boolean> | undefined
+    )
   }
 
   return merged
@@ -81,7 +93,7 @@ export async function createBuiltinAgents(
     let config = factory(model)
 
     if (override) {
-      config = mergeAgentConfig(config, override)
+      config = mergeAgentConfig(config, override, name)
     }
 
     result[name] = config
@@ -109,7 +121,7 @@ export async function createBuiltinAgents(
     let config = factory(model)
 
     if (override) {
-      config = mergeAgentConfig(config, override)
+      config = mergeAgentConfig(config, override, name)
     }
 
     result[name] = config
@@ -151,7 +163,7 @@ export async function createBuiltinAgents(
     let vigiloConfig = createVigiloAgent(vigiloModel, availableAuditors, availableSkills)
 
     if (vigiloOverride) {
-      vigiloConfig = mergeAgentConfig(vigiloConfig, vigiloOverride)
+      vigiloConfig = mergeAgentConfig(vigiloConfig, vigiloOverride, "vigilo")
     }
 
     result["vigilo"] = vigiloConfig
@@ -170,7 +182,7 @@ export async function createBuiltinAgents(
     let quaestorConfig = createQuaestorAgent(quaestorModel, availableAuditors, availableSkills)
 
     if (quaestorOverride) {
-      quaestorConfig = mergeAgentConfig(quaestorConfig, quaestorOverride)
+      quaestorConfig = mergeAgentConfig(quaestorConfig, quaestorOverride, "quaestor")
     }
 
     result["quaestor"] = quaestorConfig

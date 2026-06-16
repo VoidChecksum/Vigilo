@@ -24,30 +24,39 @@ import { createTokenAuditor, TOKEN_AUDITOR_METADATA } from "./token-auditor"
 
 export type AuditorFactory = (model?: string) => AgentConfig
 
-/** Specialist auditors only — utility agents (vigilo, quaestor, explorator, speculator, faber, purifier, verifier, triage, validator) are in agents/ */
-export type SpecialistAuditorName = Exclude<BuiltinAuditorName, "vigilo" | "quaestor" | "explorator" | "speculator" | "faber" | "purifier" | "verifier" | "triage" | "validator">
+/** Specialist auditors only — utility/infra agents (vigilo, quaestor, explorator, speculator, faber, sandbox, graph-builder, purifier, verifier, triage, validator) are in agents/ */
+export type SpecialistAuditorName = Exclude<BuiltinAuditorName, "vigilo" | "quaestor" | "explorator" | "speculator" | "faber" | "sandbox" | "graph-builder" | "purifier" | "verifier" | "triage" | "validator">
 
-export const AUDITOR_FACTORIES: Record<SpecialistAuditorName, AuditorFactory> = {
-  "reentrancy-auditor": createReentrancyAuditor,
-  "oracle-auditor": createOracleAuditor,
-  "access-control-auditor": createAccessControlAuditor,
-  "flashloan-auditor": createFlashloanAuditor,
-  "logic-auditor": createLogicAuditor,
-  "defi-auditor": createDefiAuditor,
-  "cross-chain-auditor": createCrossChainAuditor,
-  "token-auditor": createTokenAuditor,
+/** A specialist auditor's single-point registration (Decepticon SubAgentSpec analogue). */
+export interface AuditorSpec {
+  name: SpecialistAuditorName
+  factory: AuditorFactory
+  metadata: AuditorPromptMetadata
 }
 
-export const AUDITOR_METADATA: Record<SpecialistAuditorName, AuditorPromptMetadata> = {
-  "reentrancy-auditor": REENTRANCY_AUDITOR_METADATA,
-  "oracle-auditor": ORACLE_AUDITOR_METADATA,
-  "access-control-auditor": ACCESS_CONTROL_AUDITOR_METADATA,
-  "flashloan-auditor": FLASHLOAN_AUDITOR_METADATA,
-  "logic-auditor": LOGIC_AUDITOR_METADATA,
-  "defi-auditor": DEFI_AUDITOR_METADATA,
-  "cross-chain-auditor": CROSS_CHAIN_AUDITOR_METADATA,
-  "token-auditor": TOKEN_AUDITOR_METADATA,
-}
+/**
+ * Single source of truth for the specialist auditor roster — adding an auditor is one
+ * entry here, not parallel edits across several maps. The factory/metadata maps below
+ * are derived from this list.
+ */
+export const AUDITOR_SPECS: AuditorSpec[] = [
+  { name: "reentrancy-auditor", factory: createReentrancyAuditor, metadata: REENTRANCY_AUDITOR_METADATA },
+  { name: "oracle-auditor", factory: createOracleAuditor, metadata: ORACLE_AUDITOR_METADATA },
+  { name: "access-control-auditor", factory: createAccessControlAuditor, metadata: ACCESS_CONTROL_AUDITOR_METADATA },
+  { name: "flashloan-auditor", factory: createFlashloanAuditor, metadata: FLASHLOAN_AUDITOR_METADATA },
+  { name: "logic-auditor", factory: createLogicAuditor, metadata: LOGIC_AUDITOR_METADATA },
+  { name: "defi-auditor", factory: createDefiAuditor, metadata: DEFI_AUDITOR_METADATA },
+  { name: "cross-chain-auditor", factory: createCrossChainAuditor, metadata: CROSS_CHAIN_AUDITOR_METADATA },
+  { name: "token-auditor", factory: createTokenAuditor, metadata: TOKEN_AUDITOR_METADATA },
+]
+
+export const AUDITOR_FACTORIES = Object.fromEntries(
+  AUDITOR_SPECS.map((s) => [s.name, s.factory])
+) as Record<SpecialistAuditorName, AuditorFactory>
+
+export const AUDITOR_METADATA = Object.fromEntries(
+  AUDITOR_SPECS.map((s) => [s.name, s.metadata])
+) as Record<SpecialistAuditorName, AuditorPromptMetadata>
 
 export function createAllAuditors(model?: string): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}

@@ -1,5 +1,5 @@
 ---
-name: LayerZero Integration Patterns
+name: layerzero
 description: >
   Auto-loaded by cross-chain-auditor agent during Phase 2 when LayerZero is detected.
   Provides patterns for: OApp security (peer validation), OFT tokens (slippage),

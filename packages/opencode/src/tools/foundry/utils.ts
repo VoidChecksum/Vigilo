@@ -1,16 +1,32 @@
-import { spawn } from "bun"
+import { runCommand as runSandboxed, type RunCommandResult } from "../../shared/exec"
 
-export async function runCommand(cmdArgs: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const proc = spawn(cmdArgs, {
-    stdout: "pipe",
-    stderr: "pipe",
+/** Default wall-clock budget for Foundry commands (forge test can fuzz). */
+export const FOUNDRY_TIMEOUT_MS = 300_000
+
+export interface RunForgeOptions {
+  /** Working directory to pin execution to (the audit workspace). */
+  cwd: string
+  /** Override the default timeout. */
+  timeoutMs?: number
+  /** Extra env keys to expose (e.g. a vetted RPC URL var). */
+  allowEnvKeys?: string[]
+}
+
+/**
+ * Run a Foundry/`cast` command through the sandboxed runner: pinned cwd,
+ * timeout, output cap, and scrubbed environment. Returns the full result so
+ * callers can surface timeouts/truncation.
+ */
+export async function runCommand(
+  cmdArgs: string[],
+  opts: RunForgeOptions
+): Promise<RunCommandResult> {
+  return runSandboxed({
+    argv: cmdArgs,
+    cwd: opts.cwd,
+    timeoutMs: opts.timeoutMs ?? FOUNDRY_TIMEOUT_MS,
+    allowEnvKeys: opts.allowEnvKeys,
   })
-
-  const stdout = await new Response(proc.stdout).text()
-  const stderr = await new Response(proc.stderr).text()
-  const exitCode = await proc.exited
-
-  return { stdout, stderr, exitCode }
 }
 
 export function parseTestSummary(stdout: string): { passed: number; failed: number } {

@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { runCommand, parseTestSummary } from "./utils"
+import { runCommand, parseTestSummary, FOUNDRY_TIMEOUT_MS } from "./utils"
+import type { RunCommandResult } from "../../shared/exec"
 import {
   FOUNDRY_BUILD_DESCRIPTION,
   FOUNDRY_TEST_DESCRIPTION,
@@ -8,15 +9,31 @@ import {
 } from "./constants"
 import { log } from "../../shared"
 
+/**
+ * Surface the sandboxed runner's timeout / missing-binary signals as actionable
+ * messages, mirroring the slither/mythril wrappers. Returns a message string
+ * when the run failed to even produce a usable result, else null.
+ */
+function failureHint(result: RunCommandResult, label: string, binary: string): string | null {
+  if (result.timedOut) {
+    return `${label} timed out after ${FOUNDRY_TIMEOUT_MS}ms. Reduce scope (e.g. --match-test/--match-contract) or raise the timeout.`
+  }
+  if (result.exitCode === 127 || result.error?.includes("ENOENT")) {
+    return `\`${binary}\` not found on PATH. Install Foundry: https://getfoundry.sh`
+  }
+  return null
+}
+
 export const forge_build: ToolDefinition = tool({
   description: FOUNDRY_BUILD_DESCRIPTION,
   args: {
     optimize: tool.schema.boolean().optional().describe("Enable optimizer (default: false)"),
     optimizer_runs: tool.schema.number().optional().describe("Optimizer runs (default: 200)"),
   },
-  async execute(args) {
+  async execute(args, context) {
     log("forge_build", args)
 
+    const cwd = (context as { directory?: string })?.directory ?? process.cwd()
     const cmdArgs = ["forge", "build"]
     if (args.optimize) {
       cmdArgs.push("--optimize")
@@ -26,7 +43,10 @@ export const forge_build: ToolDefinition = tool({
     }
 
     try {
-      const { stdout, stderr, exitCode } = await runCommand(cmdArgs)
+      const result = await runCommand(cmdArgs, { cwd })
+      const hint = failureHint(result, "Build", "forge")
+      if (hint) return hint
+      const { stdout, stderr, exitCode } = result
 
       return exitCode === 0
         ? `Build successful.\n\n${stdout}`
@@ -48,9 +68,10 @@ export const forge_test: ToolDefinition = tool({
     fork_url: tool.schema.string().optional().describe("Fork from mainnet/testnet RPC URL"),
     fork_block: tool.schema.number().optional().describe("Fork at specific block number"),
   },
-  async execute(args) {
+  async execute(args, context) {
     log("forge_test", args)
 
+    const cwd = (context as { directory?: string })?.directory ?? process.cwd()
     const verbosity = args.verbosity ?? 3
     const vFlag = "-" + "v".repeat(Math.min(Math.max(verbosity, 1), 5))
 
@@ -73,7 +94,10 @@ export const forge_test: ToolDefinition = tool({
     }
 
     try {
-      const { stdout, stderr, exitCode } = await runCommand(cmdArgs)
+      const result = await runCommand(cmdArgs, { cwd })
+      const hint = failureHint(result, "Tests", "forge")
+      if (hint) return hint
+      const { stdout, stderr, exitCode } = result
       const { passed, failed } = parseTestSummary(stdout)
       const summary = `\n\n**Summary**: ${passed} passed, ${failed} failed`
 
@@ -93,9 +117,10 @@ export const forge_coverage: ToolDefinition = tool({
     report: tool.schema.enum(["summary", "lcov", "debug"]).optional().describe("Report format (default: summary)"),
     match_contract: tool.schema.string().optional().describe("Contract pattern to match"),
   },
-  async execute(args) {
+  async execute(args, context) {
     log("forge_coverage", args)
 
+    const cwd = (context as { directory?: string })?.directory ?? process.cwd()
     const cmdArgs = ["forge", "coverage"]
     if (args.report) {
       cmdArgs.push("--report", args.report)
@@ -105,7 +130,10 @@ export const forge_coverage: ToolDefinition = tool({
     }
 
     try {
-      const { stdout, stderr, exitCode } = await runCommand(cmdArgs)
+      const result = await runCommand(cmdArgs, { cwd })
+      const hint = failureHint(result, "Coverage", "forge")
+      if (hint) return hint
+      const { stdout, stderr, exitCode } = result
 
       return exitCode === 0
         ? `Coverage report:\n\n${stdout}`
@@ -126,9 +154,10 @@ export const cast_call: ToolDefinition = tool({
     rpc_url: tool.schema.string().optional().describe("RPC URL (default: from foundry.toml)"),
     block: tool.schema.number().optional().describe("Block number to query at"),
   },
-  async execute(args) {
+  async execute(args, context) {
     log("cast_call", args)
 
+    const cwd = (context as { directory?: string })?.directory ?? process.cwd()
     const cmdArgs = ["cast", "call", args.to, args.sig]
 
     if (args.args && args.args.length > 0) {
@@ -142,7 +171,10 @@ export const cast_call: ToolDefinition = tool({
     }
 
     try {
-      const { stdout, stderr, exitCode } = await runCommand(cmdArgs)
+      const result = await runCommand(cmdArgs, { cwd })
+      const hint = failureHint(result, "Call", "cast")
+      if (hint) return hint
+      const { stdout, stderr, exitCode } = result
 
       return exitCode === 0
         ? `Result: ${stdout.trim()}`
