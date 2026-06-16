@@ -1,0 +1,14 @@
+# markdownlint configuration for Vigilo
+# Docs: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+# Strict-but-practical: enable everything except the rules below.
+
+default: true
+
+# MD013 line-length — disabled: long tables and links make wrapping noisy.
+MD013: false
+
+# MD033 inline HTML — allowed: README badges, <img>, <details>, etc. need it.
+MD033: false
+
+# MD036 emphasis-as-heading — allowed: used for lightweight section labels.
+MD036: false

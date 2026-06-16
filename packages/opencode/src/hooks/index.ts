@@ -9,3 +9,4 @@ export { createThinkModeHook } from "./think-mode";
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
+export { createOutputTokenFloorHook, DEFAULT_OUTPUT_TOKEN_FLOOR } from "./output-token-floor";

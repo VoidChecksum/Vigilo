@@ -1,2 +1,5 @@
 [test]
 root = "src"
+# Coverage floor — enforced only with `--coverage` (see `make test-coverage` + CI).
+# Set just below current coverage to catch regressions; ratchet upward over time.
+coverageThreshold = { line = 0.55, function = 0.55 }

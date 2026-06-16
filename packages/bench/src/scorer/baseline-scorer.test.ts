@@ -1,5 +1,24 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeAll, afterAll } from "bun:test"
 import type { ScaBenchBaseline } from "../types"
+import { __setMockResponder } from "../client/opencode"
+
+// These tests exercise scoreBaseline's matching pipeline, which calls the LLM
+// via sendPrompt(). Inject a deterministic "no match" responder so the suite is
+// hermetic (no live OpenCode server) and never depends on network/model output.
+beforeAll(() => {
+  __setMockResponder(() => ({
+    is_match: false,
+    is_partial_match: false,
+    explanation: "mock: no match",
+    severity_from_junior_auditor: "",
+    severity_from_truth: "",
+    index_of_finding_from_junior_auditor: -1,
+  }))
+})
+
+afterAll(() => {
+  __setMockResponder(null)
+})
 
 describe("scoreBaseline function", () => {
   describe("#given baseline-scorer module", () => {

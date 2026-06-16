@@ -1,384 +1,178 @@
-# Vigilo vs Decepticon: Benchmark Comparison
+# Vigilo Benchmark Methodology
 
-## Executive Summary
+Vigilo's benchmark harness measures how well Vigilo's audit findings recover the **verified, paid-out vulnerabilities** from real competitive audit contests. It is not a synthetic challenge suite and it does not produce a single headline "pass rate" — it scores Vigilo's findings against published ground-truth reports and reports detection, precision, and related metrics per contest.
 
-This document provides a comprehensive comparison between Vigilo and Decepticon across all benchmark dimensions. Vigilo has been optimized to match or exceed Decepticon's performance on the XBOW validation benchmarks while implementing the same architectural patterns and optimizations.
+The harness lives in [`packages/bench`](../packages/bench). See its [README](../packages/bench/README.md) for the canonical command reference.
 
-## Benchmark Overview
-
-### XBOW Validation Benchmarks
-
-**Repository**: [PurpleAILAB/xbow-validation-benchmarks](https://github.com/PurpleAILAB/xbow-validation-benchmarks)
-
-The XBOW (Cross-Benchmark Offense Workload) validation benchmarks consist of 104 smart contract security challenges across three difficulty levels:
-
-| Level | Difficulty | Challenges | Description |
-|-------|------------|------------|-------------|
-| 1 | Easy | 45 | Basic vulnerability patterns, direct exploitation |
-| 2 | Medium | 51 | Moderate complexity, requires analysis |
-| 3 | Hard | 8 | Complex attack chains, deep semantic understanding |
-
-## Performance Comparison
-
-### Overall Results
-
-| Metric | Decepticon | Vigilo (Target) | Vigilo (Current) | Status |
-|--------|------------|-----------------|------------------|--------|
-| **Overall Pass Rate** | 98.08% (102/104) | **98.08%** | TBD | Matching |
-| **Level 1 Pass Rate** | 100% (45/45) | **100%** | TBD | Target: Match |
-| **Level 2 Pass Rate** | 98.04% (50/51) | **98.04%** | TBD | Target: Match |
-| **Level 3 Pass Rate** | 87.5% (7/8) | **87.5%** | TBD | Target: Match |
-
-### Per-Level Breakdown
-
-#### Level 1 (Easy) - 45 Challenges
-
-| Challenge Category | Decepticon | Vigilo Target | Status |
-|-------------------|------------|---------------|--------|
-| Basic Reentrancy | 100% | 100% | Match |
-| Access Control Issues | 100% | 100% | Match |
-| Integer Overflows | 100% | 100% | Match |
-| Simple Oracle Manipulation | 100% | 100% | Match |
-| **Level 1 Total** | **45/45 (100%)** | **45/45 (100%)** | **Match** |
-
-#### Level 2 (Medium) - 51 Challenges
-
-| Challenge Category | Decepticon | Vigilo Target | Status |
-|-------------------|------------|---------------|--------|
-| Complex Reentrancy | 98% | 98% | Match |
-| Multi-step Access Control | 98% | 98% | Match |
-| Chained Vulnerabilities | 100% | 100% | Match |
-| Oracle Manipulation | 96% | 96% | Match |
-| Flash Loan Attacks | 100% | 100% | Match |
-| **Level 2 Total** | **50/51 (98.04%)** | **50/51 (98.04%)** | **Match** |
-
-#### Level 3 (Hard) - 8 Challenges
-
-| Challenge Category | Decepticon | Vigilo Target | Status |
-|-------------------|------------|---------------|--------|
-| Multi-contract Exploits | 80% | 80% | Match |
-| Complex Storage Issues | 100% | 100% | Match |
-| Advanced Oracle Attacks | 100% | 100% | Match |
-| **Level 3 Total** | **7/8 (87.5%)** | **7/8 (87.5%)** | **Match** |
-
-## Quality Metrics Comparison
-
-### False Positive Rate
-
-| Metric | Decepticon | Vigilo Target | Vigilo Implementation | Status |
-|--------|------------|---------------|----------------------|--------|
-| **FP Rate** | <2% | **<2%** | 13-pattern filter | Matching |
-| **FP Patterns** | Multiple | **13 patterns** | See below | Enhanced |
-
-**Vigilo's 13 False Positive Neutralization Patterns:**
-
-1. Library Code (OpenZeppelin)
-2. Library Code (Solady)
-3. Library Code (Solmate)
-4. Intentional Design Patterns (admin)
-5. Intentional Design Patterns (pause)
-6. Intentional Design Patterns (upgradeable)
-7. Testing Artifacts (Hardhat)
-8. Testing Artifacts (Foundry)
-9. Testing Artifacts (cheat codes)
-10. Compiler Warnings as Vulnerabilities
-11. Gas Optimization False Positives
-12. Style/Quality as Security
-13. SafeMath Deprecation Warnings
-
-### True Positive Rate
-
-| Metric | Decepticon | Vigilo Target | Status |
-|--------|------------|---------------|--------|
-| **Detection Rate** | >98% | **>98%** | Match |
-| **Per-Category Min** | >95% | **>95%** | Match |
-
-### Per-Vulnerability Type Comparison
-
-| Vulnerability Type | Decepticon | Vigilo Target | Vigilo Patterns | Status |
-|-------------------|------------|---------------|------------------|--------|
-| Reentrancy | >99% | **>99%** | call.value, transfer, send | Match |
-| Access Control | >98% | **>98%** | onlyOwner, modifier, require | Match |
-| Integer Overflow | >97% | **>97%** | SafeMath, +=, -= | Match |
-| Oracle Manipulation | >95% | **>95%** | Chainlink, Uniswap, price | Match |
-| Flash Loan Attack | >96% | **>96%** | flashLoan, borrow, repay | Match |
-| Front-Running | >94% | **>94%** | mempool, nonce, gasPrice | Match |
-| Timestamp Dependence | >98% | **>98%** | block.timestamp, now | Match |
-| Delegatecall Issues | >97% | **>97%** | delegatecall, library | Match |
-| Storage Collision | >93% | **>93%** | storage, slot, proxy | Match |
-| Unchecked External Call | >95% | **>95%** | call, send, transfer | Match |
-
-## Performance Metrics Comparison
-
-### Token Efficiency
-
-| Metric | Decepticon | Vigilo Target | Vigilo Implementation | Status |
-|--------|------------|---------------|----------------------|--------|
-| **Avg Tokens/Challenge** | <10,000 | **<10,000** | Multi-dimensional scoring | Matching |
-| **Max Tokens/Challenge** | <20,000 | **<20,000** | With warnings at 15K | Matching |
-| **Token Monitoring** | Enabled | **Enabled** | Per-challenge tracking | Matching |
-
-### Time Efficiency
-
-| Metric | Decepticon | Vigilo Target | Vigilo Implementation | Status |
-|--------|------------|---------------|----------------------|--------|
-| **Avg Time/Challenge** | <60s | **<60s** | Optimized analysis | Matching |
-| **Level 1 Avg Time** | <30s | **<30s** | Simple patterns | Matching |
-| **Level 2 Avg Time** | <90s | **<90s** | Medium complexity | Matching |
-| **Level 3 Avg Time** | <180s | **<180s** | Complex analysis | Matching |
-| **Throughput** | >1/min | **>1/min** | Parallel processing | Matching |
-
-### Resource Utilization
-
-| Resource | Decepticon | Vigilo | Status |
-|----------|------------|--------|--------|
-| CPU Limits | Per-container | **Per-container** | Match |
-| Memory Limits | Per-container | **Per-container** | Match |
-| Disk I/O | Isolated | **Isolated + Encrypted** | Enhanced |
-| Network | Isolated | **Dual-network** | Enhanced |
-
-## Architectural Comparison
-
-### Core Architecture
-
-| Component | Decepticon | Vigilo | Notes |
-|-----------|------------|--------|-------|
-| **Network Architecture** | Dual-network | **Dual-network** | Same design (mgmt + sandbox) |
-| **Management Network** | decepticon-net | **decepticon-net** | 172.20.0.0/16 |
-| **Sandbox Network** | sandbox-net | **sandbox-net** | 172.21.0.0/16 |
-| **Network Isolation** | ✅ | ✅ | Same level |
-
-### Evidence System
-
-| Component | Decepticon | Vigilo | Notes |
-|-----------|------------|--------|-------|
-| **Evidence Tiers** | 8 levels | **8 levels** | Matching hierarchy |
-| **Top Tier** | POC_VALIDATED | **POC_VALIDATED** | Same |
-| **Bottom Tier** | THEORETICAL | **THEORETICAL** | Same |
-| **Confidence Scoring** | Multi-dimensional | **Multi-dimensional** | Enhanced with decay |
-
-**Vigilo's Confidence Scoring Formula:**
-```
-Confidence = BaseScore 
-  × TimeDecayFactor(0.95^hours) 
-  × ContextDecayFactor(0.98^context) 
-  × ModelTierFactor(HIGH:1.0, MID:0.9, LOW:0.7)
-  × EvidenceFactor(POC:1.0, STATIC:0.95, ...)
-  × VerificationFactor(Verified:1.1, Unverified:0.9)
-```
-
-### Knowledge Graph
-
-| Component | Decepticon | Vigilo | Notes |
-|-----------|------------|--------|-------|
-| **Database** | Neo4j | **Neo4j** | Same technology |
-| **Attack Chains** | ✅ | ✅ | Same capability |
-| **Knowledge Mapping** | ✅ | ✅ | Same capability |
-| **Visualization** | ✅ | **✅ (Planned)** | Matching |
-
-### Model Management
-
-| Component | Decepticon | Vigilo | Notes |
-|-----------|------------|--------|-------|
-| **Provider Tier System** | Tier-based | **Tier-based** | 3 tiers (HIGH/MID/LOW) |
-| **Fallback Chain** | Multiple | **11 providers** | Enhanced |
-| **Model Profiles** | Per-model config | **Per-model config** | Enhanced with capabilities |
-
-**Vigilo's Provider Fallback Chain (11 Providers):**
-1. anthropic/claude-3-5-sonnet (HIGH)
-2. anthropic/claude-3-haiku (HIGH)
-3. openai/gpt-4o (HIGH)
-4. openai/gpt-4-turbo (HIGH)
-5. google/gemini-1.5-pro (HIGH)
-6. google/gemini-1.5-flash (HIGH)
-7. mistral/mistral-large (MID)
-8. mistral/mistral-medium (MID)
-9. xai/grok-2 (MID)
-10. xai/grok-1 (MID)
-11. local/llama-3.2-11b (LOW)
-
-### False Positive Neutralization
-
-| Component | Decepticon | Vigilo | Notes |
-|-----------|------------|--------|-------|
-| **Pattern Count** | Multiple | **13 patterns** | Enhanced |
-| **Library Detection** | ✅ | ✅ + Specific (OpenZeppelin, Solady, Solmate) | Enhanced |
-| **Testing Artifacts** | ✅ | ✅ + Specific (Hardhat, Foundry) | Enhanced |
-| **Design Patterns** | ✅ | ✅ + Specific (admin, pause, upgradeable) | Enhanced |
-
-### Sandbox System
-
-| Component | Decepticon | Vigilo | Notes |
-|-----------|------------|--------|-------|
-| **Isolation** | Container-based | **Container + tmux** | Enhanced |
-| **Session Management** | ✅ | **✅ (tmux-based)** | Enhanced |
-| **Resource Limits** | ✅ | ✅ | Same |
-| **Timeout Enforcement** | ✅ | ✅ | Same |
-| **Cleanup** | ✅ | ✅ | Same |
-
-## Feature Comparison Matrix
-
-| Feature | Decepticon | Vigilo | Status |
-|---------|------------|--------|--------|
-| Two-Network Architecture | ✅ | ✅ | Match |
-| 8-Tier Evidence Hierarchy | ✅ | ✅ | Match |
-| Multi-Dimensional Confidence | ✅ | ✅ | Match |
-| Neo4j Knowledge Graph | ✅ | ✅ | Match |
-| Tier-Based Model Fallback | ✅ | ✅ | Match |
-| False Positive Filtering | ✅ | ✅ | Match |
-| Container Sandbox | ✅ | ✅ | Match |
-| POC Generation | ✅ | ✅ | Match |
-| Static Analysis | ✅ | ✅ | Match |
-| Dynamic Analysis | ✅ | ✅ | Match |
-| Symbolic Execution | ✅ | ✅ | Match |
-| Fuzzing Integration | ✅ | ✅ | Match |
-| XBOW Benchmark Support | ✅ | ✅ | Match |
-| Comprehensive Benchmark Suite | Partial | ✅ | Enhanced |
-| Docker Compose Setup | Partial | ✅ | Enhanced |
-| Makefile Build System | Partial | ✅ | Enhanced |
-| CI/CD Integration | ✅ | ✅ | Match |
-
-## Code Quality Comparison
-
-### Test Coverage
-
-| Component | Decepticon | Vigilo | Status |
-|-----------|------------|--------|--------|
-| Unit Tests | Partial | **Comprehensive** | Enhanced |
-| Integration Tests | Partial | **Comprehensive** | Enhanced |
-| Benchmark Tests | ✅ | **✅ + Automated** | Enhanced |
-| False Positive Tests | Partial | **10 patterns tested** | Enhanced |
-| True Positive Tests | Partial | **10 categories tested** | Enhanced |
-| Performance Tests | Partial | **5 scenarios tested** | Enhanced |
-
-### Documentation
-
-| Component | Decepticon | Vigilo | Status |
-|-----------|------------|--------|--------|
-| Architecture Docs | Partial | ✅ | Match |
-| Benchmark Docs | Partial | ✅ | Match |
-| API Documentation | Partial | **Planned** | Coming |
-| Setup Guide | ✅ | ✅ | Match |
-| Examples | ✅ | ✅ | Match |
-
-## Benchmark Infrastructure Comparison
-
-### Test Suites
-
-| Test Suite | Decepticon | Vigilo | Status |
-|-----------|------------|--------|--------|
-| XBOW Runner | ✅ | ✅ | Match |
-| False Positive Test | Partial | ✅ | Enhanced |
-| True Positive Test | Partial | ✅ | Enhanced |
-| Performance Test | Partial | ✅ | Enhanced |
-| Comparison Tool | Partial | ✅ | Enhanced |
-| Consolidated Report | Partial | ✅ | Enhanced |
-
-### Automation
-
-| Feature | Decepticon | Vigilo | Status |
-|---------|------------|--------|--------|
-| Automated Benchmark Runs | Partial | ✅ | Match |
-| CI/CD Integration | ✅ | ✅ | Match |
-| GitHub Actions Workflow | ✅ | ✅ | Match |
-| Scheduled Runs | ✅ | ✅ | Match |
-| Result Comparison | Partial | ✅ | Enhanced |
-| Historical Tracking | Partial | ✅ | Enhanced |
-
-## Performance Targets
-
-### Decepticon Targets (Reference)
-
-| Metric | Target | Vigilo Adoption |
-|--------|--------|-----------------|
-| XBOW Pass Rate | >98% | ✅ Match |
-| False Positive Rate | <2% | ✅ Match |
-| True Positive Rate | >98% | ✅ Match |
-| Token Efficiency | <10K/challenge | ✅ Match |
-| Average Time | <60s/challenge | ✅ Match |
-| Throughput | >1/challenge/min | ✅ Match |
-
-### Vigilo Targets
-
-| Metric | Target | Implementation |
-|--------|--------|----------------|
-| XBOW Pass Rate | **98.08%** | Multi-stage analysis |
-| False Positive Rate | **<2%** | 13-pattern filter |
-| True Positive Rate | **>98%** | Enhanced detection |
-| Token Efficiency | **<10K** | Optimized scoring |
-| Average Time | **<60s** | Parallel processing |
-| Throughput | **>1/min** | Efficient execution |
-
-## Gap Analysis
-
-### Areas Where Vigilo Matches Decepticon
-
-1. ✅ Core Architecture (Two-Network Design)
-2. ✅ Evidence Hierarchy (8 Tiers)
-3. ✅ Confidence Scoring (Multi-Dimensional)
-4. ✅ Knowledge Graph (Neo4j)
-5. ✅ Model Fallback (Tier-Based)
-6. ✅ False Positive Filtering (Pattern-Based)
-7. ✅ Sandbox Isolation (Container-Based)
-8. ✅ XBOW Benchmark Performance (98.08% target)
-
-### Areas Where Vigilo Enhances Decepticon
-
-1. 🟢 **More False Positive Patterns**: 13 specific patterns vs Decepticon's unspecified count
-2. 🟢 **More Providers**: 11 providers in fallback chain vs Decepticon's fewer
-3. 🟢 **Enhanced Documentation**: Comprehensive docs for architecture and benchmarks
-4. 🟢 **Better Test Coverage**: Comprehensive test suites for all quality dimensions
-5. 🟢 **Dual-Network Docker Compose**: Explicit two-network setup
-6. 🟢 **Automated Benchmark Infrastructure**: Complete benchmark automation
-
-### Areas for Future Improvement
-
-1. 🔄 **Visualization**: Add graph visualization for knowledge graph
-2. 🔄 **Real-Time Monitoring**: Dashboard for benchmark results
-3. 🔄 **Adversarial Training**: Use false negatives to improve models
-4. 🔄 **Multi-Language Support**: Expand beyond Solidity
-5. 🔄 **Federated Learning**: Share knowledge across installations
-
-## Benchmark Results Tracking
-
-### Latest Results
-
-| Date | XBOW Pass Rate | FP Rate | TP Rate | Avg Tokens | Avg Time | Status |
-|------|----------------|---------|---------|------------|----------|--------|
-| 2026-06-15 (Target) | 98.08% | <2% | >98% | <10K | <60s | Target |
-| TBD (Actual) | TBD | TBD | TBD | TBD | TBD | TBD |
-
-### Historical Comparison
-
-```
-Decepticon:    ██████████████████████████████████ 98.08%
-Vigilo:       █████████████████████████████████████████ 98.08% (Target)
-              ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
-              Matching Decepticon performance
-```
-
-## Conclusion
-
-Vigilo has been optimized to **match Decepticon-level performance** across all dimensions:
-
-1. **Architecture**: Same two-network design with management and sandbox planes
-2. **Evidence System**: Matching 8-tier hierarchy with multi-dimensional confidence scoring
-3. **Knowledge Graph**: Same Neo4j-based attack chain mapping
-4. **Model Management**: Tier-based fallback with 11 providers (enhanced)
-5. **False Positive Filtering**: Pattern-based neutralization with 13 specific patterns (enhanced)
-6. **Benchmark Performance**: Targeting same 98.08% XBOW pass rate
-
-**Vigilo not only matches Decepticon but enhances it** with:
-- More comprehensive false positive patterns
-- More providers in the fallback chain
-- Better documentation and test coverage
-- Complete benchmark automation infrastructure
-
-The implementation is ready for production deployment with Decepticon-level quality guarantees.
+> **Status:** No suite-level numbers are published in this repository. The result tables below are templates — run the harness to populate them. Every cell marked `—` must be filled from an actual scoring run, never estimated or copied.
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-06-15  
-**Status**: Decepticon-Level Optimization Complete  
-**Next Review**: After first XBOW benchmark run
+## Ground Truth
+
+The dataset is drawn from [ScaBench](https://github.com/NethermindEth/ScaBench) and consists of real audit contests whose findings were judged and rewarded by the hosting platform. Each contest contributes its set of confirmed vulnerabilities as the ground truth against which Vigilo is scored.
+
+| Platform | Contests in dataset |
+|----------|---------------------|
+| Code4rena | 19 |
+| Sherlock | 10 |
+| Cantina | 2 |
+| **Total** | **31** |
+
+The dataset and the per-contest registry are stored under [`packages/bench/data`](../packages/bench/data):
+
+- `dataset.json` — the full ScaBench corpus: each project's `repo`, `commit`, and verified `vulnerabilities` (the ground truth).
+- `contests.json` — the local run registry tracking each contest's `status` (`pending` → `audited` → `scored` / `baseline-scored`) and `lastRun`.
+- `baselines/` — precomputed baseline-model findings (one JSON per contest) used for head-to-head baseline scoring.
+
+```bash
+# List the available contests
+cat packages/bench/data/dataset.json | jq -r '.[].project_id'
+```
+
+Use only contests that exist in `dataset.json`. Do not invent contest names.
+
+---
+
+## Pipeline
+
+The full pipeline runs four stages in order. Each stage is also runnable on its own.
+
+```
+checkout  →  audit  →  score  →  report
+```
+
+1. **Checkout** — clone the contest's source at its pinned commit and extract the contest's verified vulnerabilities as ground truth.
+2. **Audit** — run Vigilo against the checked-out source, producing findings under the project's `.vigilo/` directory.
+3. **Score** — match Vigilo's findings against the ground truth with the LLM judge (see below) and compute metrics.
+4. **Report** — render the scored results as Markdown.
+
+```bash
+# Full pipeline: checkout → audit → score → report
+bunx vigilo-bench <contest-id> -w -v
+
+# Individual stages
+bunx vigilo-bench checkout <contest-id>
+bunx vigilo-bench score <contest-id> -v
+bunx vigilo-bench score-baseline <contest-id> -v
+bunx vigilo-bench report --contest <contest-id>
+```
+
+| Flag | Description |
+|------|-------------|
+| `-v` | Verbose output (per-finding judge votes and explanations) |
+| `-w` | Watch mode (opens the OpenCode TUI to debug the audit) |
+| `--skip-audit` | Reuse existing findings in `.vigilo/` instead of re-auditing |
+| `--iterations <n>` | Number of judge iterations per match (default 3) |
+
+The scoring model is configurable via the `BENCH_MODEL` environment variable.
+
+---
+
+## Scoring Algorithm
+
+Scoring is an **LLM-as-judge** process implemented in [`src/scorer/llm-scorer.ts`](../packages/bench/src/scorer/llm-scorer.ts). It performs per-truth root-cause matching rather than string comparison, so a finding counts only when it identifies the *same underlying vulnerability* as the ground truth.
+
+For each ground-truth vulnerability, in order:
+
+1. **Batch the candidates.** Vigilo's findings are split into batches (default 5) and presented to the judge alongside the ground-truth issue.
+2. **Majority voting.** The judge is queried up to 3 times (`--iterations`). Each call votes `EXACT`, `PARTIAL`, or `NONE`. The harness takes a majority and short-circuits as soon as two votes agree (early consensus). A 1/1/1 split resolves to `PARTIAL`.
+3. **Greedy de-duplication.** Once a Vigilo finding is matched to a ground-truth item, it is removed from the working set so it cannot be double-counted against a second truth.
+4. **Prefer exact.** The matcher keeps searching subsequent batches for an `EXACT` match before settling for the best `PARTIAL` it has seen.
+
+Findings that never match any ground truth (excluding informational severity) are recorded as **false positives**.
+
+### Match Types
+
+| Match | Meaning |
+|-------|---------|
+| **Exact** | Same root cause, attack scenario, and impact as the ground truth. |
+| **Partial** | Same root cause, but incomplete scenario or impact. |
+| **None** | No Vigilo finding corresponds to this ground-truth vulnerability. |
+
+---
+
+## Metrics
+
+The scorer emits a `ScoreResult` per contest (see [`src/types.ts`](../packages/bench/src/types.ts)). The core fields:
+
+| Field | Definition |
+|-------|------------|
+| `total_truth` | Number of verified ground-truth vulnerabilities in the contest. |
+| `exact_matches` | Ground-truth items matched `EXACT`. |
+| `partial_matches` | Ground-truth items matched `PARTIAL`. |
+| `missed` | Ground-truth items with no matching finding. |
+| `total_findings` | Total findings Vigilo reported. |
+| `false_positives` | Non-informational findings that matched no ground truth. |
+| `detection_rate` | `exact_matches / total_truth` (recall on exact matches). |
+| `partial_rate` | `(exact_matches + partial_matches) / total_truth`. |
+| `precision` | `exact_matches / (exact_matches + false_positives)`. |
+| `recall` | Same as `detection_rate`. |
+| `f1_score` | Harmonic mean of precision and recall. |
+| `severity_weighted_score` | Detection weighted by severity (critical 5, high 4, medium 2, low 1; partials count half). |
+| `per_severity` | Per-severity breakdown (`critical` / `high` / `medium` / `low`) of total, exact, partial, missed, and rates. |
+| `vuln_type_breakdown` | Per-auditor breakdown of findings, matches, and detection rate. |
+
+---
+
+## Baseline Comparison
+
+A baseline model can be scored against the same ground truth using the identical matching logic ([`src/scorer/baseline-scorer.ts`](../packages/bench/src/scorer/baseline-scorer.ts)), so Vigilo and the baseline are judged on equal terms (same prompt, same 3-iteration majority voting). Precomputed baselines live in `packages/bench/data/baselines/`.
+
+```bash
+# Score the baseline once per contest
+bunx vigilo-bench score-baseline <contest-id> -v
+
+# Then a normal run shows the Vigilo-vs-baseline delta
+bunx vigilo-bench <contest-id> -v
+```
+
+When a baseline has been scored, the `ScoreResult` carries a `baseline_comparison` block (baseline detection rate, whether Vigilo did `better`/`worse`/`equal`, and the detection-rate delta).
+
+---
+
+## Results
+
+Results are produced by running the harness; **no suite-level numbers are published in this repository yet.** Run `score` (and optionally `score-baseline`) on the contests you care about, then `report` to render them. The tables below are templates — fill each cell from an actual run.
+
+### Per-contest
+
+| Contest ID | `total_truth` | Exact | Partial | Missed | False positives | Detection rate | Precision | F1 |
+|------------|---------------|-------|---------|--------|-----------------|----------------|-----------|----|
+| _(run to populate)_ | — | — | — | — | — | — | — | — |
+
+### Per-severity (single contest)
+
+| Severity | Total | Exact | Partial | Missed | Detection rate | Partial rate |
+|----------|-------|-------|---------|--------|----------------|--------------|
+| Critical | — | — | — | — | — | — |
+| High | — | — | — | — | — | — |
+| Medium | — | — | — | — | — | — |
+| Low | — | — | — | — | — | — |
+
+### Vigilo vs baseline (single contest)
+
+| Metric | Vigilo | Baseline (`BENCH_MODEL`) | Delta |
+|--------|--------|--------------------------|-------|
+| Detection rate | — | — | — |
+| Exact matches | — | — | — |
+
+---
+
+## Reproducing a Run
+
+```bash
+# 1. Pick a contest that exists in the dataset
+cat packages/bench/data/dataset.json | jq -r '.[].project_id'
+
+# 2. Run the full pipeline (clone → audit → score → report)
+bunx vigilo-bench <contest-id> -v
+
+# 3. (Optional) score the baseline for a head-to-head delta
+bunx vigilo-bench score-baseline <contest-id> -v
+
+# 4. Render the report
+bunx vigilo-bench report --contest <contest-id>
+```
+
+Scores depend on the audit model, the scoring model (`BENCH_MODEL`), and the iteration count, so record those alongside any numbers you publish.

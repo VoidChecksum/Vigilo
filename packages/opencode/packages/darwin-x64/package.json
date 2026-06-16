@@ -1,8 +1,8 @@
 {
   "name": "vigilo-darwin-x64",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Platform-specific binary for vigilo (darwin-x64)",
-  "license": "BSL-1.1",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/PurpleAILAB/Vigilo"

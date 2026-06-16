@@ -289,7 +289,7 @@ const promptLines = [
   "  emit FeeUpdated(newFee);",
   "}",
   "",
-  "REJECT if flagged as vulnerability - if protocol design includes admin functions."
+  "REJECT if flagged as vulnerability - if protocol design includes admin functions.",
   "",
   "### Oracle False Positives",
   "Safe - Using Chainlink with proper validation:",

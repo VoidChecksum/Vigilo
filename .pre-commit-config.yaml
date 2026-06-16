@@ -1,0 +1,44 @@
+# pre-commit configuration for Vigilo
+# Install: pre-commit install
+# Run on all files: pre-commit run --all-files
+# Docs: https://pre-commit.com
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-merge-conflict
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.18.1
+    hooks:
+      - id: markdownlint-cli2
+        args: [--config, .markdownlint.yaml]
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.29.10
+    hooks:
+      - id: typos
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [--config-file, .yamllint.yaml]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  # Secret scanning — Vigilo ingests attacker-controllable text and ships configs;
+  # block committed credentials/keys before they land.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

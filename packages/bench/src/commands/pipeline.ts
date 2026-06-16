@@ -1,11 +1,12 @@
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/client";
 import { spawn, exec, type ChildProcess } from "child_process";
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { platform } from "os";
 import { checkout } from "./checkout.js";
 import { score } from "./score.js";
 import { report } from "./report.js";
+import { sumSessionUsage } from "../client/opencode.js";
 import { log, error, sourcePath, truthPath } from "../utils.js";
 
 const AUDIT_PORT = 4097;
@@ -181,14 +182,28 @@ async function runAudit(sourceDir: string, client: OpencodeClient): Promise<bool
     const completed = await waitForAuditComplete(sourceDir, AUDIT_TIMEOUT_60_MINUTES_MS);
     
     if (!completed) {
-      error("Audit timeout - no findings generated within 30 minutes");
+      error("Audit timeout - no findings generated within 60 minutes");
       return false;
     }
     
     console.log(); // newline after dots
     log("Audit completed!");
+
+    // Capture the AUDIT run's cost/tokens (distinct from scoring) before the session
+    // is deleted, so the benchmark can report cost-per-audit. Best-effort.
+    try {
+      const msgs = await client.session.messages({ path: { id: sessionId } });
+      const list = (msgs.data ?? msgs) as Array<{ info?: { cost?: number; tokens?: { input?: number; output?: number; reasoning?: number } } }>;
+      const usage = sumSessionUsage(list);
+      const costPath = join(sourceDir, ".vigilo", "audit-cost.json");
+      writeFileSync(costPath, JSON.stringify({ cost_usd: usage.cost, tokens: usage.tokens }, null, 2));
+      log(`Audit cost: $${usage.cost.toFixed(4)}, ${usage.tokens} tokens (saved to .vigilo/audit-cost.json)`);
+    } catch (e) {
+      log(`Could not capture audit cost: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
     return true;
-    
+
   } finally {
     // Cleanup session
     await client.session.delete({ path: { id: sessionId } }).catch(() => {});

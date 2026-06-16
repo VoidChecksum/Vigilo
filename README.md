@@ -18,7 +18,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/PurpleAILAB/Vigilo?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/PurpleAILAB/Vigilo?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/PurpleAILAB/Vigilo?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/issues)
-[![License](https://img.shields.io/badge/license-BSL--1.1-white?labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-white?labelColor=black&style=flat-square)](https://github.com/PurpleAILAB/Vigilo/blob/main/LICENSE)
 
 </div>
 
@@ -84,7 +84,7 @@ bunx vigilo install
 
 ```bash
 /plugin marketplace add PurpleAILAB/Vigilo
-/plugin install vigilo@Vigilo
+/plugin install vigilo@vigilo
 ```
 
 ---
@@ -249,11 +249,9 @@ This resets the plugin path to `vigilo@latest`.
 
 ## License
 
-[Business Source License 1.1](LICENSE)
+[MIT License](LICENSE)
 
-- **Non-production use**: Free
-- **Production use**: Requires commercial license
-- **Change Date**: 2029-01-21 (converts to Apache-2.0)
+Vigilo is free and open source for any use — personal, research, or commercial.
 
 Commercial licensing: catower917@gmail.com
 

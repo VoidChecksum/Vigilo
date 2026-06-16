@@ -1,5 +1,5 @@
 ---
-name: Chainlink Integration Patterns
+name: chainlink
 description: >
   Auto-loaded by oracle-auditor agent during Phase 2 when Chainlink is detected.
   Provides patterns for: Price Feeds (stale check, decimals), VRF (front-running),

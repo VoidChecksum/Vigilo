@@ -499,6 +499,10 @@ export async function runScorer(
     per_severity: perSeverity,
     vuln_type_breakdown: vulnTypeBreakdown,
     audit_duration_ms: auditDurationMs,
+    audit_cost_usd: null,
+    audit_tokens: null,
+    scoring_cost_usd: null,
+    scoring_tokens: null,
     baseline_comparison: null,
   };
 }

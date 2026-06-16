@@ -1,0 +1,5 @@
+[test]
+# Coverage floor — enforced only when tests run with `--coverage` (e.g. `make test-coverage`
+# and CI). Set just below current coverage so it catches regressions without blocking work;
+# ratchet upward as coverage improves.
+coverageThreshold = { line = 0.55, function = 0.50 }

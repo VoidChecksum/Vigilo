@@ -47,6 +47,7 @@ export const HookNameSchema = z.enum([
   "thinking-block-validator",
   "edit-error-recovery",
   "delegate-task-retry",
+  "output-token-floor",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
@@ -135,6 +136,12 @@ export const BackgroundTaskConfigSchema = z.object({
   defaultConcurrency: z.number().min(1).optional(),
   providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   modelConcurrency: z.record(z.string(), z.number().min(0)).optional(),
+  /**
+   * Cap on TOTAL concurrent background agents across all models (default 5).
+   * Bounds runaway fan-out; set to 0 to disable, or 3 to enforce the documented
+   * "max parallel auditors".
+   */
+  maxConcurrentTasks: z.number().min(0).optional(),
   staleTimeoutMs: z.number().min(60000).optional(),
 })
 
@@ -157,6 +164,12 @@ export const TmuxConfigSchema = z.object({
 export const VigiloConfigSchema = z.object({
   $schema: z.string().optional(),
   foundry: z.boolean().optional(),
+  /**
+   * Minimum per-request output-token budget enforced for every agent (clamped
+   * to each model's real output limit). Prevents the provider's low default
+   * (~4096) from truncating large reports/PoCs. Defaults to 16384.
+   */
+  max_output_tokens: z.number().int().positive().optional(),
   auditors: AuditorOverridesSchema.optional(),
   disabled_auditors: z.array(BuiltinAuditorNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),

@@ -27,7 +27,7 @@ Register the marketplace:
 Install the plugin:
 
 ```bash
-/plugin install vigilo@Vigilo
+/plugin install vigilo@vigilo
 ```
 
 ## Update
@@ -84,10 +84,6 @@ Install the plugin:
 
 ## License
 
-This project is licensed under the [Business Source License 1.1](../../LICENSE).
-
-- **Non-production use**: Free (personal, educational, research, non-commercial security auditing)
-- **Production use**: Requires commercial license
-- **Change Date**: 2029-01-21 (converts to Apache-2.0)
+This project is licensed under the [MIT License](../../LICENSE) — free and open source for any use, including commercial.
 
 Commercial licensing: catower917@gmail.com

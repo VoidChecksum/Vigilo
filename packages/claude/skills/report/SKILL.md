@@ -48,7 +48,7 @@ Code4rena, Cantina, Sherlock, and Immunefi.
 ### Step 1: Collect Data Sources
 
 ```
-# Sub-auditor draft findings
+# Sub-auditor draft findings (each carries the canonical YAML frontmatter contract)
 Glob(".vigilo/findings/**/*.md")
 
 # PoC validation results
@@ -58,13 +58,35 @@ Glob(".vigilo/poc/*.md")
 Glob("test/poc/*.t.sol")
 ```
 
-### Step 2: Filter by Validation Status
+Each finding begins with the **canonical frontmatter contract** (see the
+`vulnerability-base` skill): `id`, `severity`, `likelihood`, `impact`, `status`,
+`auditor`, `target`, `vuln_class`, `confidence`, `poc_path`, `duplicate_of`. Read these
+fields — do not re-derive severity/status from filenames or prose.
 
-| Status | Action |
-|--------|--------|
-| `VALIDATED` | Generate submission report |
-| `NEEDS_REVIEW` | Include in separate "Unconfirmed" section |
-| `INVALIDATED` | Exclude (false positive) |
+### Step 2: Filter by `status` (canonical, lowercase)
+
+| `status` | Action |
+|----------|--------|
+| `validated` | Generate submission report |
+| `poc-pending` / `draft` | Include only if PoC log confirms impact; otherwise hold |
+| `needs-review` | Include in a separate "Unconfirmed" section |
+| `invalidated` | Exclude (false positive) |
+
+Also **exclude any finding whose `duplicate_of` is set** — it is folded into its primary.
+
+### Step 2.5: Aggregate & De-duplicate
+
+Three parallel auditors routinely rediscover the same root cause. Before generating reports:
+
+1. Collect all non-excluded findings across `.vigilo/findings/**`.
+2. Group by root cause (same `vuln_class` + overlapping `target` file:line). For each group,
+   keep the highest-severity / strongest-evidence finding and set `duplicate_of: <primary id>`
+   on the rest (they are then excluded per Step 2).
+3. Sort the survivors by severity (Critical→Low), then by `likelihood`×`impact`.
+4. Assign final **globally-unique** contest ids (`H-01`, `H-02`, `M-01`, …) for the report,
+   preserving the original `id` in the submission body for traceability.
+
+Unmerged duplicates are penalized by Code4rena/Sherlock — this step is required, not optional.
 
 ### Step 3: Select Platform
 
@@ -81,7 +103,7 @@ Glob("test/poc/*.t.sol")
 
 ### Step 4: Generate Submission Reports
 
-For each VALIDATED finding, create submission-ready report:
+For each `validated` finding (per the `status` field), create a submission-ready report:
 
 **Filename format**: `{Severity}-{id}-{kebab-case-title}.md`
 
@@ -247,12 +269,14 @@ For contest submissions, also export individual findings:
 | [cantina.md](templates/cantina.md) | When submitting to Cantina reviews |
 | [immunefi.md](templates/immunefi.md) | When submitting to Immunefi bug bounties |
 | [standard.md](templates/standard.md) | For general/private audit reports |
+| [executive-summary.md](templates/executive-summary.md) | Always — the portfolio-level report at `.vigilo/reports/{date}_{platform}_audit.md` |
 
 ### References (Load on demand)
 
 | File | When to Load |
 |------|--------------|
 | [severity-classification.md](references/severity-classification.md) | When determining severity - contains platform-specific criteria |
+| [vuln-taxonomy.md](references/vuln-taxonomy.md) | When setting/validating each finding's `vuln_class` (SWC / DASP / CWE) |
 
 ### External References (For validation)
 

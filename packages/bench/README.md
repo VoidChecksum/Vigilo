@@ -107,4 +107,4 @@ cat packages/bench/data/dataset.json | jq -r '.[].project_id'
 
 ## License
 
-[BSL-1.1](../../LICENSE)
+[MIT License](../../LICENSE)

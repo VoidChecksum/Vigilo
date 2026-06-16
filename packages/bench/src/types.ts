@@ -25,6 +25,13 @@ export interface ScaBenchProject {
 
 export type ScaBenchDataset = ScaBenchProject[];
 
+export type FindingStatus =
+  | "draft"
+  | "poc-pending"
+  | "validated"
+  | "needs-review"
+  | "invalidated";
+
 export interface VigiloFinding {
   id: string;
   title: string;
@@ -33,6 +40,19 @@ export interface VigiloFinding {
   description: string;
   file?: string;
   filePath: string;
+  // --- Canonical finding contract (present when the finding file has YAML frontmatter) ---
+  /** Lifecycle status; `invalidated` findings are excluded from scoring. */
+  status?: FindingStatus;
+  /** Vulnerability taxonomy id (SWC / CWE / DASP), e.g. "SWC-107". */
+  vuln_class?: string;
+  /** 0-100 confidence score from the verification pipeline. */
+  confidence?: number;
+  /** Affected line range within `file`, e.g. "42-58". */
+  lines?: string;
+  /** When set, this finding duplicates another (excluded from scoring). */
+  duplicate_of?: string | null;
+  likelihood?: string;
+  impact?: string;
 }
 
 export type MatchType = "exact" | "partial" | "none";
@@ -112,6 +132,20 @@ export interface ScoreResult {
   per_severity: PerSeverityBreakdown;
   vuln_type_breakdown: VulnTypeStats;
   audit_duration_ms: number | null;
+  /** USD cost of the AUDIT run (captured from its OpenCode session), when available. */
+  audit_cost_usd: number | null;
+  /** Total tokens consumed by the AUDIT run, when available. */
+  audit_tokens: number | null;
+  /** USD cost of the scoring (LLM-judge) run, when the provider reports it. */
+  scoring_cost_usd: number | null;
+  /** Total tokens consumed by the scoring run, when available. */
+  scoring_tokens: number | null;
+  /** Run-to-run stability when scored with `--runs N>1` (mean ± stddev of key metrics). */
+  stability?: {
+    runs: number;
+    detection_rate: { mean: number; stddev: number; min: number; max: number };
+    f1_score: { mean: number; stddev: number; min: number; max: number };
+  };
   baseline_comparison: BaselineComparison | null;
 }
 

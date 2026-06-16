@@ -1,485 +1,250 @@
-# Vigilo Architecture - Decepticon-Level Optimization
+# Vigilo Architecture
 
 ## Overview
 
-Vigilo implements a Decepticon-level security verification pipeline with optimized architecture for maximum detection accuracy, false positive neutralization, and performance efficiency.
+Vigilo is a multi-stage smart-contract security **audit** pipeline that runs as a plugin
+inside [OpenCode](https://opencode.ai). It orchestrates a set of specialist agents
+through reconnaissance, deep analysis, PoC-based verification, and reporting — optimized
+for detection accuracy, false-positive neutralization, and reproducible evidence.
+
+Two design facts shape everything below:
+
+- **Persistence is file-based.** All audit state lives in a `.vigilo/` workspace as
+  Markdown and Solidity files. There is no database. See
+  [Attack-Chain Reasoning & the `.vigilo/` Workspace](./knowledge-graph.md).
+- **Models are OpenCode-native.** Provider/credential configuration is handled by
+  OpenCode; Vigilo adds optional per-auditor overrides via `vigilo.json`. See
+  [Models](./models.md).
 
 ## Core Architecture
 
-### Two-Network Design (Management + Sandbox Plane)
-
-Vigilo employs a dual-network architecture matching Decepticon's security isolation model:
-
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         MANAGEMENT PLANE                                │
-│                    (decepticon-net: 172.20.0.0/16)                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │
-│  │  Vigilo Core    │    │  Neo4j Graph DB  │    │  Redis Cache    │   │
-│  │  - Orchestrator  │    │  - Attack Chains │    │  - Session State │   │
-│  │  - Validators    │    │  - Knowledge Graph│    │  - Rate Limiting │   │
-│  │  - Purifier      │    │  - Evidence Map  │    │                 │   │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘   │
+│                            OpenCode host                              │
 │                                                                       │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    Provider Manager                            │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │   │
-│  │  │ Anthropic│ │  OpenAI  │ │  Google  │ │  Mistral │       │   │
-│  │  │  - 3.5   │ │  - GPT-4o│ │ - Gem1.5 │ │ - Large  │       │   │
-│  │  │  - Haiku │ │  - Turbo │ │ - Flash  │ │ - Medium │       │   │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         SANDBOX PLANE                                   │
-│                    (sandbox-net: 172.21.0.0/16)                        │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │
-│  │  Sandbox Mgr    │    │  Execution Env   │    │  File System    │   │
-│  │  - tmux sessions│    │  - Containerized │    │  - Isolated      │   │
-│  │  - Lifecycle    │    │  - Resource Ltd  │    │  - Encrypted     │   │
-│  │  - Cleanup      │    │  - Network Isolated│   │                 │   │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘   │
-│                                                                       │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    Code Analysis Sandbox                        │   │
-│  │  - Static Analysis (Slither, MythX)                          │   │
-│  │  - Dynamic Analysis (Custom Symbolic Execution)             │   │
-│  │  - Fuzzing (Echidna, Foundry)                                   │   │
-│  │  - POC Generation & Validation                                │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────┐   ┌──────────────────┐   ┌──────────────────┐   │
+│  │  Vigilo (orch.) │   │ Specialist agents │   │ QA agents         │   │
+│  │  - delegates    │   │ - reentrancy      │   │ - validator       │   │
+│  │  - verifies     │   │ - oracle          │   │ - verifier        │   │
+│  │  - reports      │   │ - access-control… │   │ - triage / purifier│  │
+│  └─────────────────┘   └──────────────────┘   └──────────────────┘   │
+│            │                     │                      │             │
+│            └─────────────────────┼──────────────────────┘            │
+│                                  ▼                                    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  Sandboxed command runner (shared/exec/runner.ts)            │    │
+│  │  cwd-pinned · timeout · output cap · scrubbed env · no shell │    │
+│  │  forge · cast · ast-grep · slither · …                       │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                  │                                    │
+│                                  ▼                                    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  .vigilo/  workspace (files: recon, findings, poc, graph,    │    │
+│  │  reports)  +  test/poc/*.t.sol                               │    │
+│  └─────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
-
-### Network Isolation
-
-- **decepticon-net (172.20.0.0/16)**: Management plane with core services
-  - Vigilo orchestration
-  - Neo4j knowledge graph
-  - Redis caching
-  - Provider API gateways
-
-- **sandbox-net (172.21.0.0/16)**: Isolated execution environment
-  - Smart contract analysis
-  - POC execution
-  - Fuzzing campaigns
-  - External tool integration
 
 ## Component Architecture
 
 ### 1. Agent Layer
 
+Vigilo is the primary orchestrator; it delegates analysis to stateless specialist
+auditors and quality-assurance agents and coordinates them through the `.vigilo/notepad/`
+shared memory.
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        AGENTS                                       │
+│                            AGENTS                                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │
-│  │   Vigilo     │ │  Speculator  │ │  Validator   │                │
-│  │  (Main)      │ │  (Static)     │ │  (Dynamic)   │                │
-│  └──────────────┘ └──────────────┘ └──────────────┘                │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │
-│  │   Explorer   │ │   Quaestor    │ │  Triager     │                │
-│  │  (Discovery) │ │  (Query)      │ │  (Prioritize)│                │
-│  └──────────────┘ └──────────────┘ └──────────────┘                │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │
-│  │   Purifier   │ │  GraphBuilder │ │  SandboxMgr   │                │
-│  │ (False +)    │ │  (KG)         │ │  (Isolation) │                │
-│  └──────────────┘ └──────────────┘ └──────────────┘                │
+│  Orchestration:  vigilo (primary)                                 │
+│  Recon:          explorator (code)    speculator (docs)           │
+│  Planning:       quaestor (pre-audit scoping)                     │
+│  Build:          faber (forge install / build)                    │
+│  Specialists:    reentrancy · oracle · access-control · flashloan │
+│                  · logic · defi · cross-chain · token             │
+│  QA:             validator → verifier → triage → purifier         │
+│  Analysis:       graph-builder (attack-chain reasoning)           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Evidence Hierarchy (8 Tiers)
+See [Agents](./agents.md) for what each one does.
+
+### 2. Evidence Hierarchy
+
+Every finding declares an evidence type, which caps the severity it is allowed to claim.
+This is the backbone of Vigilo's "no confirmation without verification" rule.
+
+| Evidence Type | What It Means | Max Severity |
+|---|---|---|
+| `POC_VALIDATED` | `forge test` passes with assertions proving impact | Critical, High |
+| `STATIC_CONFIRMED` | Code pattern matched + call path verified | High, Medium |
+| `TRACE_CONFIRMED` | Reachability proven via LSP / manual trace | Medium |
+| `THEORETICAL` | Logic argument only, no code proof | Low, Informational |
+
+`VERIFIED` findings (passing PoC) are written to `.vigilo/findings/`; `THEORETICAL`
+findings go to `.vigilo/unverified/`. A High/Critical finding **must** be
+`POC_VALIDATED` or `STATIC_CONFIRMED`.
+
+### 3. Model Configuration
+
+Vigilo does not implement its own provider abstraction, tier system, or fallback chain.
+Each agent is created with a single `model` string and resolves it as:
+
+1. **Per-auditor override** in `vigilo.json` (validated by `AuditorOverrideConfigSchema`
+   in `packages/opencode/src/config/schema.ts`).
+2. The agent's **built-in default model** (most specialists share `DEFAULT_MODEL =
+   anthropic/claude-sonnet-4-5`).
+
+Provider credentials and custom providers are configured through OpenCode itself. Full
+details in [Models](./models.md).
+
+### 4. Attack-Chain Reasoning (file-based)
+
+The `graph-builder` agent reasons about contract call structure and how findings chain
+into multi-step exploits, then writes the result to disk as Markdown summaries and
+diagram files (Mermaid / Graphviz) under `.vigilo/graph/`. The graph is a **conceptual
+model applied over the file artifacts** — there is no graph database. See
+[Attack-Chain Reasoning](./knowledge-graph.md).
+
+### 5. False Positive Neutralization
+
+The Purifier agent applies pattern-based false-positive filtering before findings reach a
+report. Categories include library code (OpenZeppelin / Solady / Solmate), intentional
+design patterns (admin functions, pausing, upgradeable proxies), testing artifacts
+(Foundry/Hardhat cheatcodes, test contracts), compiler warnings, intentional gas
+optimizations, and style/quality items.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    EVIDENCE HIERARCHY                                │
+│              FALSE POSITIVE NEUTRALIZATION PATTERNS                │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  LEVEL 1: POC_VALIDATED        ★★★★★  Confidence: 100%             │
-│  ├── Live exploit executed on testnet/mainnet                     │
-│  ├── Actual funds at risk demonstrated                            │
-│  └── Verified by security researcher                              │
-│                                                                     │
-│  LEVEL 2: STATIC_CONFIRMED      ★★★★☆  Confidence: 95%              │
-│  ├── Multiple static analyzers agree                             │
-│  ├── Manual code review confirmed                                 │
-│  └── Clear vulnerable code pattern matched                        │
-│                                                                     │
-│  LEVEL 3: TRACE_CONFIRMED       ★★★☆☆  Confidence: 90%              │
-│  ├── Symbolic execution confirms exploit path                     │
-│  ├── Fuzzing found concrete input to trigger issue                │
-│  └── Control flow analysis validated                             │
-│                                                                     │
-│  LEVEL 4: SYMBOLIC_CONFIRMED    ★★☆☆☆  Confidence: 85%              │
-│  ├── Symbolic execution shows potential vulnerability              │
-│  └── Path constraints satisfied                                   │
-│                                                                     │
-│  LEVEL 5: HEURISTIC_CONFIRMED   ★☆☆☆☆  Confidence: 80%              │
-│  ├── Pattern matching with high confidence                        │
-│  ├── Heuristic analysis detected anomaly                         │
-│  └── Statistical analysis flagged as suspicious                   │
-│                                                                     │
-│  LEVEL 6: STATIC_SUGGESTED      ★★★☆☆  Confidence: 70%              │
-│  ├── Single static analyzer flagged                               │
-│  └── Requires manual verification                                 │
-│                                                                     │
-│  LEVEL 7: HEURISTIC_SUGGESTED    ★☆☆☆☆  Confidence: 50%              │
-│  ├── Pattern matching with low confidence                          │
-│  └── May be false positive                                        │
-│                                                                     │
-│  LEVEL 8: THEORETICAL            ☆☆☆☆☆  Confidence: 20%              │
-│  ├── Theoretical possibility only                                 │
-│  ├── No concrete evidence                                         │
-│  └── Speculative finding                                          │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 3. Confidence Scoring System
-
-Multi-dimensional confidence scoring with decay factors:
-
-```
-Confidence Score = 
-  BaseScore 
-  × TimeDecayFactor      (0.95^hours_since_detection)
-  × ContextDecayFactor   (0.98^(context_tokens/1000))
-  × ModelTierFactor      (HIGH: 1.0, MID: 0.9, LOW: 0.7)
-  × EvidenceFactor        (POC: 1.0, STATIC: 0.95, TRACE: 0.9, ...)
-  × VerificationFactor    (Verified: 1.1, Unverified: 0.9)
-```
-
-**Model Tier System:**
-- **HIGH**: Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 Pro
-- **MID**: Claude 3 Haiku, GPT-4 Turbo, Mistral Large
-- **LOW**: Llama 3.2, Grok-2, Local models
-
-### 4. Knowledge Graph Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    NEO4J KNOWLEDGE GRAPH                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐    │
-│  │   Contract    │────▶│   Function   │────▶│  Vulnerability│    │
-│  │   Node        │     │    Node      │     │     Node     │    │
-│  └──────────────┘     └──────────────┘     └──────────────┘    │
-│          │                   │                   │                │
-│          ▼                   ▼                   ▼                │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐    │
-│  │  Properties:  │     │  Properties:  │     │  Properties:  │    │
-│  │  - address    │     │  - name      │     │  - type      │    │
-│  │  - bytecode   │     │  - selector   │     │  - severity  │    │
-│  │  - verified   │     │  - modifier   │     │  - evidence  │    │
-│  │  - version    │     │  - visibility │     │  - confidence│    │
-│  └──────────────┘     └──────────────┘     └──────────────┘    │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    ATTACK CHAINS                            │    │
-│  │                                                             │    │
-│  │  (ContractA)─[exploit]─▶(VulnerabilityX)─[leads_to]─▶        │    │
-│  │                    │                                         │    │
-│  │                    ▼                                         │    │
-│  │  (FunctionY)──[calls]─▶(FunctionZ)──[vulnerable]─▶          │    │
-│  │                    │                                         │    │
-│  │                    ▼                                         │    │
-│  │  (Attacker)─[can_exploit]─▶(Impact: Theft/DoS/Manipulation)   │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 5. Provider Abstraction Layer
-
-```typescript
-// Tier-based model fallback with 11 providers
-
-interface ProviderConfig {
-  name: ProviderName;
-  tier: ModelTier; // HIGH | MID | LOW
-  models: ModelProfile[];
-  apiKey: string;
-  baseURL?: string;
-  timeout: number;
-  rateLimit: number;
-}
-
-// Fallback chain: HIGH → MID → LOW
-const FALLBACK_CHAIN: ProviderName[] = [
-  "anthropic",      // HIGH
-  "openai",         // HIGH
-  "google",         // HIGH
-  "mistral",        // MID
-  "xai",            // MID
-  "local",          // LOW
-];
-
-// Model profiles with capabilities
-const MODEL_PROFILES: Record<ModelName, ModelProfile> = {
-  "anthropic/claude-3-5-sonnet": { tier: "HIGH", maxTokens: 64000, reasoning: true },
-  "anthropic/claude-3-haiku":    { tier: "HIGH", maxTokens: 64000, reasoning: false },
-  "openai/gpt-4o":                { tier: "HIGH", maxTokens: 128000, reasoning: true },
-  "openai/gpt-4-turbo":          { tier: "HIGH", maxTokens: 128000, reasoning: false },
-  "google/gemini-1.5-pro":       { tier: "HIGH", maxTokens: 1048576, reasoning: true },
-  "google/gemini-1.5-flash":     { tier: "HIGH", maxTokens: 1048576, reasoning: false },
-  "mistral/mistral-large":       { tier: "MID", maxTokens: 131072, reasoning: true },
-  "mistral/mistral-medium":      { tier: "MID", maxTokens: 131072, reasoning: false },
-  "xai/grok-2":                  { tier: "MID", maxTokens: 131072, reasoning: true },
-  "xai/grok-1":                  { tier: "MID", maxTokens: 65536, reasoning: false },
-  "local/llama-3.2-11b":         { tier: "LOW", maxTokens: 32768, reasoning: false },
-};
-```
-
-### 6. False Positive Neutralization (13 Patterns)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              FALSE POSITIVE NEUTRALIZATION PATTERNS                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  CATEGORY 1: Library Code (Safe Patterns)                         │
-│  ├─ OpenZeppelin contracts (ERC20, ERC721, Ownable, etc.)         │
-│  ├─ Solady libraries (SafeTransferLib, ERC4626, etc.)             │
-│  └─ Solmate implementations (ERC721, SafeTransfer, etc.)           │
-│                                                                     │
-│  CATEGORY 2: Intentional Design Patterns                         │
-│  ├─ Admin functions (onlyOwner, onlyAdmin)                        │
-│  ├─ Pause mechanisms (whenNotPaused, paused)                       │
-│  └─ Upgradeable patterns (proxy, implementation, upgradeTo)      │
-│                                                                     │
-│  CATEGORY 3: Testing Artifacts                                     │
-│  ├─ Hardhat cheat codes (vm.prank, vm.deal, vm.warp)               │
-│  ├─ Foundry cheat codes (stdCheats, prank, deal)                  │
-│  └─ Test contracts (describe, it, beforeEach)                      │
-│                                                                     │
-│  CATEGORY 4: Compiler Warnings                                    │
-│  ├─ SafeMath deprecation warnings                                │
-│  ├─ Unused variables                                             │
-│  └─ Missing NatSpec comments                                     │
-│                                                                     │
-│  CATEGORY 5: Gas Optimization                                     │
-│  ├─ Unchecked arithmetic (intentional)                           │
-│  ├─ Assembly blocks                                              │
-│  └─ Storage packing optimizations                                │
-│                                                                     │
-│  CATEGORY 6: Style/Quality                                        │
-│  ├─ Code formatting issues                                       │
-│  ├─ Missing event emits                                          │
-│  └─ Non-standard naming conventions                              │
-│                                                                     │
+│  Library Code            OpenZeppelin, Solady, Solmate            │
+│  Intentional Design      onlyOwner, whenNotPaused, proxy/upgrade  │
+│  Testing Artifacts       vm.prank/deal/warp, test contracts       │
+│  Compiler Warnings       deprecations, unused vars, missing NatSpec│
+│  Gas Optimization        unchecked math, assembly, storage packing│
+│  Style / Quality         formatting, missing events, naming       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Flow
 
 ```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Input   │────▶│  Parser  │────▶│ Explorer │────▶│  Specu- │
-│ Contract │     │          │     │          │     │  lator   │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘
-                                                     │
-                                                     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         ANALYSIS PHASE                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐    │
-│  │Static Analysis│   │Dynamic Analysis│   │Symbolic Execution    │    │
-│  │- Slither     │   │- POC Gen     │   │- Custom Engine       │    │
-│  │- MythX       │   │- Validation   │   │- Path Exploration    │    │
-│  │- Semgrep     │   └─────────────┘   └─────────────────────┘    │
-│  └─────────────┘                                                     │
-│        │                                                               │
-│        ▼                                                               │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │                    FINDINGS AGGREGATION                        │  │
-│  │                                                             │  │
-│  │  [Finding1]────[Finding2]────[FindingN]                       │  │
-│  │       │            │             │                            │  │
-│  │       ▼            ▼             ▼                            │  │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐       │  │
-│  │  │  Deduplicate │ │   Cluster    │ │   Prioritize │       │  │
-│  │  │  (same issue)│ │  (related)    │ │  (by severity)│       │  │
-│  │  └──────────────┘ └──────────────┘ └──────────────┘       │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      VALIDATION PHASE                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐    │
-│  │  Validator  │   │  Verifier   │   │   Confidence Scorer  │    │
-│  │- Check POC  │   │- Verify FP   │   │- Multi-dimensional    │    │
-│  │- Validate   │   │- Neutralize  │   │- Decay factors        │    │
-│  │- Test POC   │   │- 13 patterns │   │- Evidence hierarchy   │    │
-│  └─────────────┘   └─────────────┘   └─────────────────────┘    │
-│        │                   │                   │                │
-│        └───────────────────┼───────────────────┘                │
-│                            ▼                                        │
-│              ┌─────────────────────────────┐                       │
-│              │     FINAL FINDINGS            │                       │
-│              │  - Verified vulnerabilities   │                       │
-│              │  - False positives filtered  │                       │
-│              │  - Confidence scores assigned │                       │
-│              │  - Attack chains mapped      │                       │
-│              └─────────────────────────────┘                       │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      OUTPUT PHASE                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐    │
-│  │  Report     │   │  Knowledge   │   │   Notifications       │    │
-│  │  - Markdown │   │  Graph       │   │   - Slack/Discord     │    │
-│  │  - JSON     │   │  - Neo4j     │   │   - Email            │    │
-│  │  - SARIF     │   │  - Visualization│   │   - Webhooks        │    │
-│  └─────────────┘   └─────────────┘   └─────────────────────┘    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
+Input contracts
+   │
+   ▼  Phase 0   Scope resolution → .vigilo/scope.md
+   │  Phase 0.5 Build (faber, background): forge install / build
+   ▼
+Phase 1  Recon (parallel): explorator (code) + speculator (docs)
+   │     → .vigilo/recon/*.md ; seed .vigilo/notepad/
+   ▼
+Phase 1.5  Risk-weighted priority map → notepad/risk-priorities.md
+   │
+   ▼
+Phase 2  Deep analysis (≤3 specialists in parallel)
+   │     each: hypothesize → write PoC (test/poc/*.t.sol) → forge test
+   │     → VERIFIED (.vigilo/findings/) or THEORETICAL (.vigilo/unverified/)
+   ▼
+Phase 3  PoC validation & quality review: re-run PoCs, deduplicate, cross-reference,
+   │       enforce evidence→severity caps
+   ▼
+Phase 3.5  QA pipeline:
+   │   validator (Slither/Mythril) → verifier (5-stage) →
+   │   triage (severity/priority) → purifier (false-positive filter)
+   ▼
+Phase 4  Report generation → .vigilo/reports/
 ```
 
-## Sandbox Architecture
+All inter-phase state is passed through files in `.vigilo/` — primarily the notepad,
+which is the shared memory for the otherwise-stateless auditors.
 
-### Container-Based Isolation
+## Sandboxed Execution
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    SANDBOX MANAGER                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    TMUX SESSION MANAGEMENT                      ││
-│  │                                                             ││
-│  │  Session: vigilo-sandbox-{uuid}                                ││
-│  │  ├─ Window 0: Code Analysis                                    ││
-│  │  ├─ Window 1: POC Execution                                    ││
-│  │  ├─ Window 2: Fuzzing                                          ││
-│  │  └─ Window 3: Monitoring/logs                                  ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    CONTAINER MANAGEMENT                          ││
-│  │                                                             ││
-│  │  Container: vigilo-analysis-{uuid}                            ││
-│  │  ├─ Network: sandbox-net (isolated)                            ││
-│  │  ├─ Volumes: /tmp/vigilo-sandbox (encrypted)                   ││
-│  │  ├─ Limits: CPU, Memory, Disk I/O                              ││
-│  │  ├─ Timeout: Configurable (default: 300s)                      ││
-│  │  └─ Cleanup: Automatic on completion/failure                   ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
-```
+Auditing runs **untrusted code**: `forge test` compiles and executes attacker-supplied
+contest Solidity, and `cast` can hit arbitrary RPC endpoints. Every external binary
+Vigilo invokes goes through a single sandboxed command runner —
+[`packages/opencode/src/shared/exec/runner.ts`](../packages/opencode/src/shared/exec/runner.ts).
+This is process-level hardening on the host, **not** Docker or container isolation.
 
-### Security Measures
+By construction, every call gets:
 
-1. **Network Isolation**: sandbox-net cannot access decepticon-net
-2. **Filesystem Isolation**: Encrypted volumes, read-only where possible
-3. **Resource Limits**: CPU, memory, disk I/O limits per container
-4. **Timeout Enforcement**: Hard timeout with graceful shutdown
-5. **Cleanup Guarantees**: Containers and sessions always cleaned up
-6. **Audit Logging**: All sandbox operations logged
+1. **A mandatory `cwd`**, pinned to the audit workspace.
+2. **A hard wall-clock timeout** — the process is `SIGTERM`'d on expiry and
+   `SIGKILL`'d shortly after if it hangs (default 5 minutes).
+3. **An output cap per stream** (default 1 MiB) to prevent memory/context flooding;
+   excess is truncated with a marker.
+4. **A scrubbed environment** — only `PATH`/`HOME`/locale variables, an explicit
+   allowlist (e.g. `FOUNDRY_*`, `SOLC_*`), and caller-vetted keys are exposed, so
+   unrelated secrets (API keys, cloud creds) never leak into untrusted execution.
+5. **No shell** — arguments are passed as an argv array, eliminating shell
+   interpolation/injection.
 
-## Performance Optimization
+The runner never throws for command-level failures: a non-zero exit, a timeout, or a
+missing binary all return a populated result the caller can inspect.
 
-### Caching Strategy
+## Benchmarking
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CACHING LAYERS                                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  LEVEL 1: In-Memory Cache (Hot Data)                              │
-│  ├── Analysis results (5 minute TTL)                              │
-│  ├── Confidence scores (1 hour TTL)                               │
-│  └─ Finding deduplication (session lifetime)                       │
-│                                                                     │
-│  LEVEL 2: Redis Cache (Warm Data)                                 │
-│  ├── Contract bytecode hashes (24 hour TTL)                        │
-│  ├── Static analysis results (1 hour TTL)                         │
-│  ├── Known vulnerability patterns (persistent)                     │
-│  └─ Rate limiting state (10 minute TTL)                            │
-│                                                                     │
-│  LEVEL 3: Neo4j Persistent Storage (Cold Data)                     │
-│  ├── Knowledge graph (persistent)                                  │
-│  ├── Historical findings (persistent)                              │
-│  └─ Attack chain patterns (persistent)                            │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────┘
-```
+Vigilo's audit accuracy is measured by the harness in
+[`packages/bench`](../packages/bench), which scores Vigilo's findings against real
+contest **ground-truth** reports.
 
-### Query Optimization
+- **Ground truth:** Code4rena, Sherlock, and Cantina contests, sourced via
+  [ScaBench](https://github.com/NethermindEth/ScaBench) (31 contests in the dataset).
+- **Pipeline:** `checkout` (clone source + extract ground truth) → run the audit →
+  `score` Vigilo findings → `report`.
+- **Matching:** each ground-truth issue is scored as an **exact** match (same root cause
+  + attack scenario + impact), a **partial** match (same root cause, incomplete
+  scenario/impact), or **missed**; false positives are counted separately.
+- **Metrics:** detection rate, precision, and F1, plus an optional comparison against a
+  configurable baseline model (`BENCH_MODEL`, default `anthropic/claude-opus-4-5`).
 
-- **Batch Processing**: Multiple contracts analyzed in parallel
-- **Incremental Analysis**: Only re-analyze changed code
-- **Smart Caching**: Cache based on contract hash + model fingerprint
-- **Lazy Loading**: Load knowledge graph data on-demand
+There is no fixed pass/fail target and no published suite score — numbers depend on the
+contest, the models configured, and the run. See the
+[bench README](../packages/bench/README.md) and
+[benchmark comparison](./benchmark-comparison.md) for usage.
 
-## Scalability
+## Performance & Caching
 
-### Horizontal Scaling
+Vigilo's "cache" is the `.vigilo/` workspace itself:
 
-- **Stateless Workers**: Analysis workers can scale horizontally
-- **Shared Cache**: Redis cluster for shared caching
-- **Distributed Queue**: Job queue for load balancing
-- **Database Sharding**: Neo4j cluster for graph data
+- **Notepad reuse** — auditors read shared context from `.vigilo/notepad/` instead of
+  re-reading and re-summarizing contracts, which is the main token-saver.
+- **Resumable sessions** — the orchestrator continues auditors via their `session_id`
+  rather than restarting, preserving prior analysis context.
+- **Persistent artifacts** — recon, findings, and PoC logs remain on disk between runs,
+  so re-running an audit can reuse what's already there (e.g. `--skip-audit` in the
+  bench harness).
 
-### Vertical Scaling
-
-- **Model Tier Fallback**: Automatically fall back to lower-tier models under load
-- **Adaptive Batching**: Adjust batch size based on system resources
-- **Priority Queues**: High-priority jobs processed first
+There is no Redis layer and no external cache service.
 
 ## Monitoring & Observability
 
-### Metrics
+- **Audit progress** is tracked through OpenCode's todo system; Vigilo creates per-phase
+  todos so the user sees real-time progress rather than a black box.
+- **Artifacts as audit trail** — every decision is written to `.vigilo/` (notepad,
+  per-finding files, validator/verifier/triage/purifier reports), so the full reasoning
+  chain is inspectable after the fact.
 
-- **Analysis Metrics**: Token usage, time per analysis, findings per analysis
-- **Performance Metrics**: Request latency, throughput, error rates
-- **Quality Metrics**: False positive rate, false negative rate, detection rate
-- **Resource Metrics**: CPU, memory, disk usage
+## Capability Summary
 
-### Logging
+| Feature | Vigilo | Notes |
+|---------|--------|-------|
+| Persistence | File-based `.vigilo/` workspace | Markdown + Solidity; no database |
+| Evidence Hierarchy | 4 evidence types | `POC_VALIDATED` → `THEORETICAL`, severity-capping |
+| Attack-chain reasoning | Conceptual, file-based | `graph-builder` → Mermaid/DOT/Markdown |
+| Model configuration | OpenCode-native + `vigilo.json` overrides | No tiers, no fallback chain |
+| False-positive filtering | Pattern-based (Purifier) | Library / design / test / gas / style |
+| Sandboxed execution | Hardened command runner | cwd-pin · timeout · output cap · scrubbed env · no shell |
+| Benchmark | `packages/bench` vs contest ground truth | Code4rena / Sherlock / Cantina (ScaBench) |
 
-- **Structured Logs**: JSON-formatted logs with correlation IDs
-- **Trace Context**: Distributed tracing across microservices
-- **Audit Trail**: All security-relevant operations logged
+## Future / Optional Enhancements
 
-### Alerting
+The following are **not implemented** today and are listed only as possible directions:
 
-- **Anomaly Detection**: Automatic alerts for unusual patterns
-- **Threshold Alerts**: Alerts when metrics exceed thresholds
-- **SLA Monitoring**: Track against Decepticon-level SLAs
-
-## Comparison with Decepticon
-
-| Feature | Decepticon | Vigilo | Notes |
-|---------|-----------|--------|-------|
-| Two-Network Architecture | ✅ | ✅ | Same design |
-| Evidence Hierarchy | 8 tiers | 8 tiers | Matching levels |
-| Confidence Scoring | Multi-dimensional | Multi-dimensional | With decay factors |
-| Knowledge Graph | Neo4j | Neo4j | Same technology |
-| Model Fallback | Tier-based | Tier-based | 11 providers |
-| False Positive Filtering | Pattern-based | Pattern-based | 13 patterns |
-| Sandbox Isolation | Container-based | Container-based | tmux + Docker |
-| Performance Targets | Defined | Matching | Same SLAs |
-| XBOW Benchmark | 102/104 | Target: 102/104 | 98.08% |
-
-## Future Enhancements
-
-1. **Federated Learning**: Share knowledge across installations
-2. **Continuous Benchmarking**: Automated XBOW runs on every commit
-3. **Adversarial Training**: Use false negatives to improve models
-4. **Explainable AI**: Better explanations for findings
-5. **Automated POC Generation**: Generate exploits for all findings
-6. **Multi-language Support**: Expand beyond Solidity
+1. **Graph backend** — an optional persistent property-graph store for live querying and
+   cross-audit history (see [knowledge-graph.md](./knowledge-graph.md)).
+2. **Cross-installation knowledge sharing** of vulnerability patterns.
+3. **Automated PoC generation** for a wider range of finding classes.
+4. **Multi-language support** beyond Solidity.
+5. **Richer finding explanations** for report consumers.

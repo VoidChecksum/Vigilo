@@ -1,5 +1,5 @@
 ---
-name: LSD Token Integration Patterns
+name: lsd-tokens
 description: >
   Auto-loaded by token-auditor agent during Phase 2 when LSD tokens are detected.
   Provides patterns for: stETH rebasing (use shares), wstETH wrapping, rETH/cbETH

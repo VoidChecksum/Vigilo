@@ -12,6 +12,8 @@ import {
   createThinkingBlockValidatorHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
+  createOutputTokenFloorHook,
+  DEFAULT_OUTPUT_TOKEN_FLOOR,
 } from "./hooks"
 import { log, resetMessageCursor } from "./shared"
 import {
@@ -24,6 +26,13 @@ import {
 import {
   builtinTools,
   foundryTools,
+  slitherTools,
+  mythrilTools,
+  halmosTools,
+  echidnaTools,
+  contractSourceTools,
+  kgTools,
+  planTools,
   createBackgroundOutput,
   createBackgroundCancel,
   createSkillTool,
@@ -36,8 +45,6 @@ import {
   startBackgroundCheck,
   lspManager,
 } from "./tools"
-import * as providers from "./providers"
-import * as confidenceScoring from "./utils/confidence-scoring"
 import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
@@ -70,6 +77,9 @@ const VigiloPlugin: Plugin = async (ctx) => {
   })
   const rulesInjector = createRulesInjectorHook(ctx)
   const thinkingBlockValidator = createThinkingBlockValidatorHook()
+  const outputTokenFloor = pluginConfig.disabled_hooks?.includes("output-token-floor")
+    ? undefined
+    : createOutputTokenFloorHook(pluginConfig.max_output_tokens ?? DEFAULT_OUTPUT_TOKEN_FLOOR)
   const editErrorRecovery = createEditErrorRecoveryHook(ctx)
   const delegateTaskRetry = createDelegateTaskRetryHook(ctx)
 
@@ -153,6 +163,13 @@ const VigiloPlugin: Plugin = async (ctx) => {
     tool: {
       ...builtinTools,
       ...foundryTools,
+      ...slitherTools,
+      ...mythrilTools,
+      ...halmosTools,
+      ...echidnaTools,
+      ...contractSourceTools,
+      ...kgTools,
+      ...planTools,
       ...backgroundTools,
       delegate_task: delegateTask,
       call_vigilo_agent: callVigiloAgent,
@@ -237,6 +254,10 @@ const VigiloPlugin: Plugin = async (ctx) => {
       }
     },
 
+    "chat.params": async (input, output) => {
+      await outputTokenFloor?.["chat.params"](input as never, output as never)
+    },
+
     "experimental.chat.messages.transform": async (
       input: Record<string, never>,
       output: { messages: Array<{ info: unknown; parts: unknown[] }> }
@@ -265,6 +286,11 @@ const VigiloPlugin: Plugin = async (ctx) => {
   return hooks
 }
 
+// OpenCode's plugin loader imports this module and treats every export as a Plugin
+// (it must be a function). A non-function export (previously `confidenceScoring`) makes the
+// loader reject the ENTIRE plugin ("Plugin export is not a function"), so the audit agents and
+// the /audit command silently fail to register. Export ONLY the plugin function — as both a
+// named and default export, matching the convention of plugins that load cleanly. Internal
+// utilities like confidence-scoring are imported directly from their own modules, never re-exported here.
+export { VigiloPlugin }
 export default VigiloPlugin
-
-export { providers, confidenceScoring }
